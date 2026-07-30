@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#15181a" />
+<title>SmartTD Monitor</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#15181a;
+    --panel:#1f2427;
+    --panel-border:#2c3236;
+    --amber:#ffb020;
+    --green:#3ddc84;
+    --red:#ff5d5d;
+    --ink:#e8e6e1;
+    --muted:#7c8489;
+    --mono:'IBM Plex Mono', monospace;
+    --display:'Barlow Condensed', sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--mono);
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+    pointer-events:none;
+    z-index:1;
+  }
+
+  /* Top bar */
+  header{
+    position:relative; z-index:2;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px;
+    border-bottom:1px solid var(--panel-border);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:30px; height:30px; border-radius:7px;
+    background:var(--panel); border:1.5px solid var(--amber);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--display); font-weight:700; font-size:13px; color:var(--amber);
+  }
+  .brand h1{
+    font-family:var(--display); font-weight:600; font-size:19px;
+    letter-spacing:0.02em; margin:0; color:var(--ink);
+  }
+  .conn{ display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
+  .dot.live{ background:var(--green); box-shadow:0 0 8px var(--green); animation:breathe 2.4s ease-in-out infinite; }
+  .dot.connecting{ background:var(--amber); animation:blink 0.9s steps(2,end) infinite; }
+  .dot.down{ background:var(--red); }
+  @keyframes breathe{ 0%,100%{opacity:1;} 50%{opacity:.45;} }
+  @keyframes blink{ 50%{opacity:.2;} }
+  .icon-btn{
+    background:none; border:none; color:var(--muted); padding:6px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .icon-btn:active{ color:var(--ink); }
+
+  main{ position:relative; z-index:2; flex:1; padding:16px; display:flex; flex-direction:column; gap:16px; max-width:640px; width:100%; margin:0 auto; }
+
+  /* Status console */
+  .console{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:12px;
+    padding:20px;
+    position:relative;
+    overflow:hidden;
+    transition:border-color .4s ease, box-shadow .4s ease;
+  }
+  .console.state-pendiente{ border-color:var(--amber); box-shadow:0 0 0 1px rgba(255,176,32,.15), 0 0 24px rgba(255,176,32,.08); }
+  .console.state-aceptado{ border-color:var(--green); box-shadow:0 0 0 1px rgba(61,220,132,.15), 0 0 24px rgba(61,220,132,.08); }
+  .console.state-rechazado{ border-color:var(--red); box-shadow:0 0 0 1px rgba(255,93,93,.15), 0 0 24px rgba(255,93,93,.08); }
+  .console.flash{ animation:flash .5s ease; }
+  @keyframes flash{ 0%{ filter:brightness(1.9);} 100%{ filter:brightness(1);} }
+
+  .console-eyebrow{
+    font-family:var(--display); font-size:12px; letter-spacing:.14em;
+    color:var(--muted); text-transform:uppercase; margin:0 0 6px;
+  }
+  .console-state{
+    font-family:var(--display); font-weight:700; font-size:30px;
+    letter-spacing:.01em; margin:0 0 18px; line-height:1;
+  }
+  .state-pendiente .console-state{ color:var(--amber); }
+  .state-aceptado .console-state{ color:var(--green); }
+  .state-rechazado .console-state{ color:var(--red); }
+  .state-idle .console-state{ color:var(--muted); font-weight:600; }
+
+  .fields{ display:grid; grid-template-columns:1fr; gap:12px; }
+  .field{ display:flex; flex-direction:column; gap:2px; }
+  .field-label{ font-size:10.5px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; font-family:var(--display); }
+  .field-value{ font-size:15px; color:var(--ink); word-break:break-word; }
+  .field-value.empty{ color:var(--muted); }
+  .field-value.big{ font-size:22px; font-weight:500; }
+
+  .updated-at{ margin-top:16px; font-size:10.5px; color:var(--muted); }
+
+  /* Log */
+  .log-head{ display:flex; align-items:center; justify-content:space-between; }
+  .log-head h2{ font-family:var(--display); font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0; font-weight:600; }
+  .log-clear{ background:none; border:none; color:var(--muted); font-family:var(--mono); font-size:11px; text-decoration:underline; cursor:pointer; padding:4px; }
+
+  .log{ display:flex; flex-direction:column; gap:1px; border:1px solid var(--panel-border); border-radius:12px; overflow:hidden; }
+  .log-empty{ padding:20px 16px; color:var(--muted); font-size:13px; background:var(--panel); }
+  .log-row{
+    background:var(--panel); padding:10px 14px; display:flex; gap:12px; align-items:baseline;
+    border-top:1px solid var(--panel-border);
+  }
+  .log-row:first-child{ border-top:none; }
+  .log-time{ font-size:11px; color:var(--muted); flex:none; width:52px; }
+  .log-badge{
+    flex:none; font-family:var(--display); font-size:10px; letter-spacing:.06em;
+    text-transform:uppercase; padding:2px 7px; border-radius:4px; font-weight:600;
+  }
+  .badge-pendiente{ background:rgba(255,176,32,.14); color:var(--amber); }
+  .badge-aceptado{ background:rgba(61,220,132,.14); color:var(--green); }
+  .badge-rechazado{ background:rgba(255,93,93,.14); color:var(--red); }
+  .badge-info{ background:rgba(124,132,137,.16); color:var(--muted); }
+  .log-text{ font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  footer{ position:relative; z-index:2; text-align:center; padding:10px 16px 18px; font-size:10.5px; color:var(--muted); }
+  footer span{ color:var(--amber); }
+
+  /* Setup overlay */
+  .overlay{
+    position:fixed; inset:0; z-index:10; background:rgba(21,24,26,.92); backdrop-filter:blur(3px);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .overlay[hidden]{ display:none; }
+  .sheet{
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:14px;
+    padding:24px; width:100%; max-width:380px;
+  }
+  .sheet h2{ font-family:var(--display); font-size:20px; margin:0 0 6px; color:var(--ink); }
+  .sheet p{ font-size:12.5px; color:var(--muted); line-height:1.5; margin:0 0 16px; }
+  .sheet label{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-family:var(--display); display:block; margin-bottom:6px; }
+  .sheet input{
+    width:100%; background:var(--bg); border:1px solid var(--panel-border); border-radius:8px;
+    color:var(--ink); font-family:var(--mono); font-size:14px; padding:11px 12px; margin-bottom:16px;
+  }
+  .sheet input:focus{ outline:none; border-color:var(--amber); }
+  .sheet button{
+    width:100%; background:var(--amber); border:none; border-radius:8px; color:#1a1305;
+    font-family:var(--display); font-weight:700; font-size:15px; padding:12px; cursor:pointer;
+  }
+  .sheet .hint{ margin-top:14px; margin-bottom:0; font-size:11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">TD</div>
+    <h1>SmartTD Monitor</h1>
+  </div>
+  <div style="display:flex; align-items:center; gap:14px;">
+    <div class="conn" id="connLabel"><span class="dot down" id="connDot"></span><span id="connText">sin conexión</span></div>
+    <button class="icon-btn" id="settingsBtn" title="Ajustes" aria-label="Ajustes">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="console state-idle" id="console">
+    <p class="console-eyebrow">Estado del despacho</p>
+    <p class="console-state" id="stateLabel">Esperando datos&hellip;</p>
+    <div class="fields">
+      <div class="field"><span class="field-label">Zona</span><span class="field-value big empty" id="fZona">—</span></div>
+      <div class="field"><span class="field-label">Dirección</span><span class="field-value empty" id="fDireccion">—</span></div>
+      <div class="field"><span class="field-label">Hora</span><span class="field-value empty" id="fHora">—</span></div>
+      <div class="field"><span class="field-label">Mensaje</span><span class="field-value empty" id="fTexto">—</span></div>
+      <div class="field"><span class="field-label">Botón detectado</span><span class="field-value empty" id="fBoton">—</span></div>
+    </div>
+    <p class="updated-at" id="updatedAt">Sin eventos todavía.</p>
+  </section>
+
+  <section>
+    <div class="log-head">
+      <h2>Registro en vivo</h2>
+      <button class="log-clear" id="clearLog">borrar</button>
+    </div>
+    <div class="log" id="log" style="margin-top:10px;">
+      <div class="log-empty">Los eventos que envíe el teléfono con SmartTD aparecerán aquí.</div>
+    </div>
+  </section>
+</main>
+
+<footer>canal: <span id="topicFooter">—</span> · funciona a cualquier distancia vía internet</footer>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2>Conectar teléfono</h2>
+    <p>Escribe el mismo <strong>canal secreto</strong> que configuraste en la acción HTTP del macro de MacroDroid en el teléfono con SmartTD. Debe coincidir exactamente en ambos.</p>
+    <label for="topicInput">Canal</label>
+    <input id="topicInput" type="text" placeholder="p. ej. td-carlos-8841" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    <button id="connectBtn">Conectar</button>
+    <p class="hint" style="color:var(--muted);">Se guarda solo en este teléfono.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = "smarttd_monitor_topic";
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    overlay: $("overlay"), topicInput: $("topicInput"), connectBtn: $("connectBtn"),
+    settingsBtn: $("settingsBtn"), connDot: $("connDot"), connText: $("connText"),
+    consoleEl: $("console"), stateLabel: $("stateLabel"),
+    fZona: $("fZona"), fDireccion: $("fDireccion"), fHora: $("fHora"), fTexto: $("fTexto"), fBoton: $("fBoton"),
+    updatedAt: $("updatedAt"), log: $("log"), clearLog: $("clearLog"), topicFooter: $("topicFooter"),
+  };
+
+  let es = null;
+  let topic = localStorage.getItem(STORAGE_KEY) || "";
+  let events = [];
+
+  const STATE_LABELS = {
+    pendiente: "Despacho pendiente",
+    aceptado: "Despacho aceptado",
+    rechazado: "Despacho rechazado",
+    info: "Actualización",
+  };
+
+  function setField(el, value){
+    if(value === undefined || value === null || value === ""){
+      el.textContent = "—"; el.classList.add("empty");
+    } else {
+      el.textContent = value; el.classList.remove("empty");
+    }
+  }
+
+  function beep(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.type = "square"; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.2);
+    }catch(e){}
+    if(navigator.vibrate){ try{ navigator.vibrate([80,40,80]); }catch(e){} }
+  }
+
+  function render(data){
+    const estado = (data.estado || "info").toLowerCase();
+    els.consoleEl.className = "console state-" + (STATE_LABELS[estado] ? estado : "info") + " flash";
+    requestAnimationFrame(() => setTimeout(() => els.consoleEl.classList.remove("flash"), 500));
+    els.stateLabel.textContent = STATE_LABELS[estado] || "Actualización recibida";
+    setField(els.fZona, data.zona);
+    setField(els.fDireccion, data.direccion);
+    setField(els.fHora, data.hora);
+    setField(els.fTexto, data.texto);
+    setField(els.fBoton, data.boton);
+    const now = new Date();
+    els.updatedAt.textContent = "Última actualización: " + now.toLocaleTimeString();
+    if(estado === "pendiente") beep();
+
+    events.unshift({ time: now, estado, summary: data.texto || data.direccion || data.zona || "evento recibido" });
+    events = events.slice(0, 40);
+    renderLog();
+  }
+
+  function renderLog(){
+    if(events.length === 0){
+      els.log.innerHTML = '<div class="log-empty">Los eventos que envíe el teléfono con SmartTD aparecerán aquí.</div>';
+      return;
+    }
+    els.log.innerHTML = events.map(ev => {
+      const badgeClass = "badge-" + (STATE_LABELS[ev.estado] ? ev.estado : "info");
+      const label = ev.estado.charAt(0).toUpperCase() + ev.estado.slice(1);
+      const time = ev.time.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      return `<div class="log-row"><span class="log-time">${time}</span><span class="log-badge ${badgeClass}">${label}</span><span class="log-text">${escapeHtml(ev.summary)}</span></div>`;
+    }).join("");
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function setConn(state){
+    els.connDot.className = "dot " + state;
+    els.connText.textContent = state === "live" ? "conectado" : state === "connecting" ? "conectando…" : "sin conexión";
+  }
+
+  function connect(){
+    if(!topic) return;
+    if(es){ es.close(); }
+    setConn("connecting");
+    els.topicFooter.textContent = topic;
+    es = new EventSource("https://ntfy.sh/" + encodeURIComponent(topic) + "/sse");
+    es.onopen = () => setConn("live");
+    es.onerror = () => setConn("down");
+    es.onmessage = (ev) => {
+      try{
+        const msg = JSON.parse(ev.data);
+        if(msg.event !== "message") return;
+        let payload;
+        try{ payload = JSON.parse(msg.message); }
+        catch(e){ payload = { estado:"info", texto: msg.message }; }
+        render(payload);
+      }catch(e){ /* ignora mensajes que no podemos interpretar */ }
+    };
+  }
+
+  els.settingsBtn.addEventListener("click", () => {
+    els.topicInput.value = topic;
+    els.overlay.hidden = false;
+  });
+
+  els.connectBtn.addEventListener("click", () => {
+    const val = els.topicInput.value.trim();
+    if(!val) return;
+    topic = val;
+    localStorage.setItem(STORAGE_KEY, topic);
+    els.overlay.hidden = true;
+    connect();
+  });
+
+  els.clearLog.addEventListener("click", () => { events = []; renderLog(); });
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  }
+
+  if(topic){
+    els.overlay.hidden = true;
+    connect();
+  } else {
+    els.overlay.hidden = false;
+  }
+})();
+</script>
+
+</body>
+</html>

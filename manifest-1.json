@@ -1,0 +1,15 @@
+{
+  "name": "SmartTD Monitor",
+  "short_name": "TD Monitor",
+  "description": "Monitor en tiempo real de los despachos de SmartTD",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#15181a",
+  "theme_color": "#15181a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
