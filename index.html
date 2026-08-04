@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <title>Smart TD - Monitor</title>
 
     <!-- ====== PWA: manifest e iconos ====== -->
@@ -19,8 +19,9 @@
 
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,system-ui,sans-serif; }
-        body { background:#08111f; min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:12px; }
-        .app { max-width:480px; width:100%; background:#0c1526; border-radius:22px; padding:0 0 16px; color:#f0f4fa; box-shadow:0 10px 30px rgba(0,0,0,0.6); overflow:hidden; position:relative; }
+        html { height:100%; }
+        body { background:#08111f; min-height:100vh; min-height:100dvh; display:flex; justify-content:center; align-items:flex-start; padding:12px; }
+        .app { max-width:480px; width:100%; margin:auto; background:#0c1526; border-radius:22px; padding:0 0 16px; color:#f0f4fa; box-shadow:0 10px 30px rgba(0,0,0,0.6); overflow:hidden; position:relative; }
         .header { background:#1f8a3c; padding:12px 14px 10px; display:flex; align-items:center; justify-content:space-between; }
         .header .back { font-size:1.3rem; color:#eafff0; width:28px; }
         .header .title { font-weight:700; font-size:1.05rem; letter-spacing:0.3px; text-align:center; flex:1; cursor:default; }
