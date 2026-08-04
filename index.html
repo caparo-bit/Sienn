@@ -794,6 +794,46 @@ Tiene Despacho`;
                     .catch(err => console.warn('Fallo registro SW:', err));
             });
         }
+
+        // -------------------------------------------------------------
+        // WAKE LOCK: evita que la pantalla se apague mientras la app está abierta
+        // -------------------------------------------------------------
+        let wakeLock = null;
+
+        async function solicitarWakeLock() {
+            if (!('wakeLock' in navigator)) {
+                console.warn('Wake Lock API no soportada en este navegador');
+                return;
+            }
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock liberado');
+                });
+                console.log('Wake Lock activo: la pantalla no se apagará');
+            } catch (err) {
+                // Suele fallar si la pestaña no está visible o el dispositivo lo deniega
+                console.warn('No se pudo activar Wake Lock:', err.name, err.message);
+            }
+        }
+
+        function liberarWakeLock() {
+            if (wakeLock) {
+                wakeLock.release().catch(() => {});
+                wakeLock = null;
+            }
+        }
+
+        // El navegador libera automáticamente el wake lock al minimizar/bloquear;
+        // hay que volver a pedirlo cuando la app vuelve a estar visible.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                solicitarWakeLock();
+            }
+        });
+
+        // Solicitud inicial al cargar la app
+        solicitarWakeLock();
     </script>
 </body>
 </html>
