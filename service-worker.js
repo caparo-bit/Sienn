@@ -1,63 +1,75 @@
-// Service Worker - Smart TD Monitor
-// Cachea únicamente el "app shell" (HTML/CSS/JS/iconos estáticos).
-// Los datos en vivo (ntfy.sh SSE y el webhook de MacroDroid) NUNCA se cachean,
-// para no servir despachos o estados de zona desactualizados.
-
-const CACHE_NAME = 'smarttd-shell-v1';
-const APP_SHELL = [
-    './',
-    './index.html',
-    './manifest.json',
-    './icon-192.png',
-    './icon-512.png'
-];
+const CACHE_NAME = 'smarttd-v2';
 
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
-    );
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((keys) =>
-            Promise.all(
-                keys
-                    .filter((key) => key !== CACHE_NAME)
-                    .map((key) => caches.delete(key))
-            )
-        )
-    );
-    self.clients.claim();
+    event.waitUntil(clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
-    const url = new URL(event.request.url);
+// Capturar peticiones PUSH en segundo plano
+self.addEventListener('push', (event) => {
+    let title = '📨 NUEVO DESPACHO';
+    let body = 'Tienes un nuevo despacho de taxi pendiente.';
 
-    // Nunca interceptar/cachear tráfico en vivo: ntfy.sh (SSE) ni el webhook de MacroDroid.
-    if (
-        url.hostname.includes('ntfy.sh') ||
-        url.hostname.includes('trigger.macrodroid.com') ||
-        event.request.method !== 'GET'
-    ) {
-        return; // deja pasar la petición directamente a la red
+    if (event.data) {
+        try {
+            const json = event.data.json();
+            title = json.title || title;
+            body = json.message || json.body || (typeof json === 'string' ? json : JSON.stringify(json));
+        } catch (e) {
+            body = event.data.text();
+        }
     }
 
-    // Estrategia "cache first, fallback network" solo para el app shell.
-    event.respondWith(
-        caches.match(event.request).then((cached) => {
-            if (cached) return cached;
-            return fetch(event.request)
-                .then((response) => {
-                    // Guarda copia en caché para próximas cargas offline.
-                    const responseClone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseClone);
-                    });
-                    return response;
-                })
-                .catch(() => cached);
+    const options = {
+        body: body,
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        vibrate: [500, 200, 500, 200, 500, 200, 500],
+        tag: 'despacho-notification',
+        renotify: true,
+        requireInteraction: true,
+        actions: [
+            { action: 'aceptar', title: '✅ ACEPTAR' },
+            { action: 'rechazar', title: '❌ RECHAZAR' }
+        ]
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    );
+});
+
+// Manejo de clics en las acciones del aviso nativo
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    
+    const WEBHOOK_URL = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
+    let cmd = '';
+
+    if (event.action === 'aceptar') {
+        cmd = 'despacho_aceptar';
+    } else if (event.action === 'rechazar') {
+        cmd = 'despacho_rechazar';
+    }
+
+    if (cmd) {
+        fetch(`${WEBHOOK_URL}?cmd=${encodeURIComponent(cmd)}`, { mode: 'no-cors' });
+    }
+
+    // Abrir o enfocar la aplicación web
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            for (const client of clientList) {
+                if (client.url.includes('index.html') && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow('./index.html');
+            }
         })
     );
 });
