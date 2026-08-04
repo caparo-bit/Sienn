@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <title>Smart TD - Monitor</title>
 
-    <!-- ====== PWA: manifest e iconos ====== -->
+    <!-- ====== PWA Settings & Web App Capabilities ====== -->
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#1f8a3c" />
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
@@ -15,166 +15,558 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Smart TD" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <!-- ====== fin bloque PWA ====== -->
 
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',Roboto,system-ui,sans-serif; }
-        html { height:100%; }
-        body { background:#08111f; min-height:100vh; min-height:100dvh; display:flex; justify-content:center; align-items:flex-start; padding:12px; }
-        .app { max-width:480px; width:100%; margin:auto; background:#0c1526; border-radius:22px; padding:0 0 16px; color:#f0f4fa; box-shadow:0 10px 30px rgba(0,0,0,0.6); overflow:hidden; position:relative; }
-        .header { background:#1f8a3c; padding:12px 14px 10px; display:flex; align-items:center; justify-content:space-between; }
-        .header .back { font-size:1.3rem; color:#eafff0; width:28px; }
-        .header .title { font-weight:700; font-size:1.05rem; letter-spacing:0.3px; text-align:center; flex:1; cursor:default; }
-        .header .filter { font-size:1.1rem; color:#eafff0; width:28px; text-align:right; }
-        .header-strip { height:3px; background:linear-gradient(90deg,#f4a623,#f4a623 60%,transparent 60%); }
-        .subbar { display:flex; justify-content:space-between; align-items:center; padding:6px 14px; background:#0c1526; font-size:0.72rem; color:#7fa6c9; }
-        .status-badge { font-size:0.7rem; padding:2px 10px; border-radius:30px; font-weight:600; }
-        .status-badge.online { background:#0f7b3a; color:#e0f2e0; }
-        .status-badge.offline { background:#7b1f1f; color:#fcd0d0; }
-        .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
-        .dot.online { background:#22c55e; animation:pulse 1.5s infinite; }
-        .dot.offline { background:#ef4444; }
-        @keyframes pulse { 0%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.8)} 100%{opacity:1;transform:scale(1)} }
-        .content { padding:0 14px; }
-        .btn-grid { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-top:14px; }
-        .btn-grid .btn { background:#1e3a5a; border:none; border-radius:40px; padding:12px 0; color:#eaf2fa; font-weight:600; font-size:0.72rem; text-align:center; transition:all 0.15s; box-shadow:0 4px 6px rgba(0,0,0,0.3); cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; }
-        .btn-grid .btn:active { transform:scale(0.94); background:#2a4a6a; }
-        .table-wrap { margin-top:16px; background:#0f1f33; border-radius:16px; padding:4px 0 2px; border:1px solid #1e3a5a; overflow-x:auto; }
-        table { width:100%; border-collapse:collapse; font-size:0.85rem; color:#d6e6f5; }
-        thead th { text-align:center; font-weight:700; padding:8px 4px 6px; border-bottom:1px solid #1e3a5a; font-size:0.85rem; letter-spacing:0.5px; }
-        thead th.col-p { color:#4fa8ff; }
-        thead th.col-z { color:#f4c542; }
-        thead th.col-s { color:#f45c5c; }
-        thead th.col-r { color:#4fd67a; }
-        td { text-align:center; padding:9px 4px; border-bottom:1px solid #16283f; font-weight:600; }
-        .row-label { text-align:left; padding-left:10px; font-weight:700; color:#d6e6f5; white-space:nowrap; }
-        .num { font-weight:700; color:#5c7ea0; }
-        .num.pos-p { color:#4fa8ff; }
-        .num.pos-z { color:#f4c542; }
-        .num.pos-s { color:#f45c5c; }
-        .num.pos-r { color:#4fd67a; }
-        tr.current-zone { background:#2f5fb0; }
-        tr.current-zone td, tr.current-zone .row-label { color:#ffffff; }
-        tr.current-zone .num { color:#eaf2fa; }
-        .tiles { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:16px; }
-        .tile { background:#274a7a; border-radius:14px; padding:14px 4px 10px; text-align:center; }
-        .tile .tile-icon { font-size:1.4rem; margin-bottom:6px; }
-        .tile .tile-count { font-size:1.3rem; font-weight:800; color:#fff; }
-        .tile .tile-label { font-size:0.62rem; letter-spacing:0.5px; color:#c7d9ee; margin-top:2px; font-weight:600; }
-        .foot-strip { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding:6px 4px 0; }
-        .foot-icons { display:flex; gap:16px; font-size:1.15rem; color:#7fa6c9; }
-        .foot-icons span { cursor:pointer; }
-        .libre-btn { background:#0f7b3a; color:#fff; font-weight:800; font-size:0.85rem; padding:10px 26px; border-radius:40px; cursor:pointer; user-select:none; -webkit-tap-highlight-color:transparent; box-shadow:0 4px 6px rgba(0,0,0,0.3); }
-        .libre-btn:active { transform:scale(0.94); background:#0e6a32; }
-        .toast { margin:14px 14px 0; padding:8px 12px; border-radius:30px; background:#1e3a5a; color:#b3d9ff; font-size:0.75rem; text-align:center; transition:all 0.3s; min-height:34px; display:flex; align-items:center; justify-content:center; gap:8px; }
-        .toast.success { background:#0f7b3a; color:#e0f2e0; }
-        .toast.error { background:#7b1f1f; color:#fcd0d0; }
-        .toast.warning { background:#b45309; color:#fff3e0; }
+        :root {
+            --bg-dark: #08111f;
+            --card-bg: #0c1526;
+            --header-bg: #1f8a3c;
+            --accent-gold: #f4a623;
+            --accent-blue: #4fa8ff;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --text-main: #f0f4fa;
+            --text-muted: #7fa6c9;
+            --table-header: #0f1f33;
+            --border-color: #1e3a5a;
+        }
 
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, system-ui, -apple-system, sans-serif; }
+        html { height:100%; }
+        body { 
+            background: var(--bg-dark); 
+            min-height: 100vh; 
+            min-height: 100dvh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start; 
+            padding: 12px;
+            color: var(--text-main);
+        }
+
+        .app { 
+            max-width: 480px; 
+            width: 100%; 
+            margin: auto; 
+            background: var(--card-bg); 
+            border-radius: 22px; 
+            padding: 0 0 16px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
+            overflow: hidden; 
+            position: relative; 
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* ===== CABECERA GLOBAL ===== */
+        .header { 
+            background: var(--header-bg); 
+            padding: 12px 14px 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            user-select: none;
+        }
+        .header .back { font-size: 1.3rem; color: #eafff0; width: 28px; cursor: pointer; }
+        .header .title { 
+            font-weight: 700; 
+            font-size: 1.05rem; 
+            letter-spacing: 0.3px; 
+            text-align: center; 
+            flex: 1; 
+            cursor: pointer; 
+        }
+        .header .filter { font-size: 1.1rem; color: #eafff0; width: 28px; text-align: right; cursor: pointer; }
+        .header-strip { 
+            height: 3px; 
+            background: linear-gradient(90deg, var(--accent-gold), var(--accent-gold) 60%, transparent 60%); 
+        }
+
+        /* ===== BARRA DE ESTADO DE CONEXIÓN ===== */
+        .subbar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 6px 14px; 
+            background: var(--card-bg); 
+            font-size: 0.72rem; 
+            color: var(--text-muted); 
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        .status-badge { 
+            font-size: 0.7rem; 
+            padding: 2px 10px; 
+            border-radius: 30px; 
+            font-weight: 600; 
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .status-badge.online { background: #0f7b3a; color: #e0f2e0; }
+        .status-badge.offline { background: #7b1f1f; color: #fcd0d0; }
+        
+        .dot { 
+            display: inline-block; 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+        }
+        .dot.online { background: var(--accent-green); animation: pulse 1.5s infinite; }
+        .dot.offline { background: var(--accent-red); }
+        
+        @keyframes pulse { 
+            0% { opacity: 1; transform: scale(1); } 
+            50% { opacity: 0.4; transform: scale(0.8); } 
+            100% { opacity: 1; transform: scale(1); } 
+        }
+
+        /* ===== MANEJO DE VISTAS DE ESTADO ===== */
+        .view-screen {
+            display: none;
+            width: 100%;
+        }
+        .view-screen.active {
+            display: block;
+        }
+
+        .content { padding: 0 14px; }
+
+        /* ===== PANTALLA 1: MONITOR ===== */
+        .btn-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; 
+            gap: 10px; 
+            margin-top: 14px; 
+        }
+        .btn-grid .btn { 
+            background: #1e3a5a; 
+            border: none; 
+            border-radius: 40px; 
+            padding: 18px 4px; 
+            color: #eaf2fa; 
+            font-weight: 600; 
+            font-size: 0.85rem; 
+            text-align: center; 
+            transition: all 0.15s; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+            cursor: pointer; 
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .btn-grid .btn:active { 
+            transform: scale(0.94); 
+            background: #2a4a6a; 
+        }
+
+        .table-wrap { 
+            margin-top: 16px; 
+            background: var(--table-header); 
+            border-radius: 16px; 
+            padding: 4px 0 2px; 
+            border: 1px solid var(--border-color); 
+            overflow-x: auto; 
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; color: #d6e6f5; }
+        thead th { 
+            text-align: center; 
+            font-weight: 700; 
+            padding: 8px 4px 6px; 
+            border-bottom: 1px solid var(--border-color); 
+            font-size: 0.85rem; 
+            letter-spacing: 0.5px; 
+        }
+        thead th.col-p { color: #4fa8ff; }
+        thead th.col-z { color: #f4c542; }
+        thead th.col-s { color: #f45c5c; }
+        thead th.col-r { color: #4fd67a; }
+        
+        td { text-align: center; padding: 9px 4px; border-bottom: 1px solid #16283f; font-weight: 600; }
+        .row-label { text-align: left; padding-left: 10px; font-weight: 700; color: #d6e6f5; white-space: nowrap; }
+        
+        .num { font-weight: 700; color: #5c7ea0; }
+        .num.pos-p { color: #4fa8ff; }
+        .num.pos-z { color: #f4c542; }
+        .num.pos-s { color: #f45c5c; }
+        .num.pos-r { color: #4fd67a; }
+        
+        tr.current-zone { background: #2f5fb0; }
+        tr.current-zone td, tr.current-zone .row-label { color: #ffffff; }
+        tr.current-zone .num { color: #eaf2fa; }
+
+        .tiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .tile { background: #274a7a; border-radius: 14px; padding: 14px 4px 10px; text-align: center; }
+        .tile .tile-icon { font-size: 1.4rem; margin-bottom: 6px; }
+        .tile .tile-count { font-size: 1.3rem; font-weight: 800; color: #fff; }
+        .tile .tile-label { font-size: 0.62rem; letter-spacing: 0.5px; color: #c7d9ee; margin-top: 2px; font-weight: 600; }
+
+        .foot-strip { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 6px 4px 0; }
+        .foot-icons { display: flex; gap: 16px; font-size: 1.15rem; color: var(--text-muted); }
+        .foot-icons span { cursor: pointer; }
+        
+        .libre-btn { 
+            background: #0f7b3a; 
+            color: #fff; 
+            font-weight: 800; 
+            font-size: 0.85rem; 
+            padding: 10px 26px; 
+            border-radius: 40px; 
+            cursor: pointer; 
+            user-select: none; 
+            -webkit-tap-highlight-color: transparent; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); 
+        }
+        .libre-btn:active { transform: scale(0.94); background: #0e6a32; }
+
+        /* ===== PANTALLA DETALLE DE PARADA ===== */
+        .stop-detail-container {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .stop-header-title {
+            text-align: center;
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .stop-column-headers {
+            display: flex;
+            justify-content: space-around;
+            font-size: 1.1rem;
+            font-weight: 800;
+            padding: 4px 0 8px;
+        }
+        .col-p-tag { color: #4fa8ff; }
+        .col-z-tag { color: #f4c542; }
+        .col-o-tag { color: #f45c5c; }
+
+        .stop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 52vh;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .stop-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .stop-item-index {
+            width: 22px;
+            text-align: right;
+            font-weight: 800;
+            font-size: 0.9rem;
+            color: #ffffff;
+        }
+        .stop-item-pill {
+            flex: 1;
+            background: #b58c8a;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            letter-spacing: 0.3px;
+        }
+
+        .stop-bottom-bar {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            height: 48px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .stop-bar-blue { background: #4a6fa5; }
+        .stop-bar-purple { background: #6b5b95; }
+        .stop-bar-red { background: #d9534f; }
+
+        /* ===== PANTALLA DETALLE DE SERVICIOS / RUTAS ===== */
+        .route-detail-container {
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .route-subbar {
+            background: #d4b2b0;
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.05rem;
+            text-align: center;
+            padding: 8px 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .route-list {
+            padding: 16px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 45vh;
+        }
+        .route-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        /* ===== PANTALLA 3: SERVICIO ACEPTADO ===== */
+        .service-container {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .service-card {
+            background: #0f1f33;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+        .service-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #16283f;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        }
+        .service-number {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--accent-gold);
+        }
+        .service-badge {
+            background: #0f7b3a;
+            color: #e0f2e0;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+        .service-info-group {
+            margin-bottom: 12px;
+        }
+        .service-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .service-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #ffffff;
+            word-break: break-word;
+        }
+        .service-value.highlight {
+            color: var(--accent-blue);
+        }
+        .service-obs {
+            background: #0a1628;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 0.9rem;
+            color: #d6e6f5;
+            border-left: 3px solid var(--accent-gold);
+            margin-top: 6px;
+        }
+        
+        .service-buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .service-btn {
+            background: #142438;
+            color: #5c7ea0;
+            border: 1px solid #1e3a5a;
+            border-radius: 12px;
+            padding: 12px 6px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-align: center;
+            cursor: not-allowed;
+            opacity: 0.6;
+            user-select: none;
+        }
+
+        /* ===== NOTIFICACIÓN TOAST ===== */
+        .toast { 
+            margin: 14px 14px 0; 
+            padding: 8px 12px; 
+            border-radius: 30px; 
+            background: #1e3a5a; 
+            color: #b3d9ff; 
+            font-size: 0.75rem; 
+            text-align: center; 
+            transition: all 0.3s; 
+            min-height: 34px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+        }
+        .toast.success { background: #0f7b3a; color: #e0f2e0; }
+        .toast.error { background: #7b1f1f; color: #fcd0d0; }
+        .toast.warning { background: #b45309; color: #fff3e0; }
+
+        /* ===== MODAL DE DESPACHO (PANTALLA COMPLETA) ===== */
         .modal-overlay {
-            position:absolute;
-            top:0;
-            left:0;
-            width:100%;
-            height:100%;
-            background:rgba(0,0,0,0.75);
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            z-index:1000;
-            border-radius:22px;
-            backdrop-filter:blur(4px);
-            opacity:0;
-            pointer-events:none;
-            transition:opacity 0.25s ease;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(6px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
         }
         .modal-overlay.active {
-            opacity:1;
-            pointer-events:auto;
+            opacity: 1;
+            pointer-events: auto;
         }
         .modal-box {
-            background:#0f1f33;
-            width:92%;
-            max-height:85%;
-            border-radius:24px;
-            padding:20px 18px 18px;
-            border:1px solid #2a4a7a;
-            box-shadow:0 20px 40px rgba(0,0,0,0.7);
-            display:flex;
-            flex-direction:column;
-            overflow:hidden;
+            background: #0f1f33;
+            width: 95%;
+            max-width: 500px;
+            max-height: 95vh;
+            border-radius: 28px;
+            padding: 24px 20px 20px;
+            border: 1px solid #2a4a7a;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         .modal-box .modal-title {
-            font-size:1.2rem;
-            font-weight:700;
-            color:#f4c542;
-            margin-bottom:8px;
-            display:flex;
-            justify-content:center;
-            align-items:center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #f4c542;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .modal-box .modal-content {
-            flex:1;
-            overflow-y:auto;
-            background:#0a1628;
-            border-radius:12px;
-            padding:16px 14px;
-            margin:6px 0 14px;
-            color:#d6e6f5;
-            max-height:60vh;
+            flex: 1;
+            overflow-y: auto;
+            background: #0a1628;
+            border-radius: 14px;
+            padding: 20px 16px;
+            margin: 6px 0 16px;
+            color: #d6e6f5;
+            max-height: 70vh;
         }
         .modal-box .modal-content .despacho-hora {
-            font-size:1.1rem;
-            font-weight:800;
-            color:#f4c542;
-            margin-bottom:10px;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #f4c542;
+            margin-bottom: 12px;
         }
         .modal-box .modal-content .despacho-dir {
-            font-size:0.95rem;
-            line-height:1.4;
-            color:#d6e6f5;
-            margin-bottom:16px;
-            word-break:break-word;
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: #d6e6f5;
+            margin-bottom: 18px;
+            word-break: break-word;
         }
         .modal-box .modal-content .despacho-pregunta {
-            font-size:1rem;
-            font-weight:700;
-            text-align:center;
-            color:#ffffff;
-            padding-top:10px;
-            border-top:1px solid #1e3a5a;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-align: center;
+            color: #ffffff;
+            padding-top: 12px;
+            border-top: 1px solid #1e3a5a;
         }
         .modal-box .modal-buttons {
-            display:flex;
-            gap:14px;
-            justify-content:center;
-            margin-top:4px;
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            margin-top: 4px;
         }
         .modal-box .modal-buttons button {
-            flex:1;
-            padding:14px 10px;
-            border:none;
-            border-radius:40px;
-            font-weight:800;
-            font-size:1rem;
-            cursor:pointer;
-            transition:transform 0.1s;
-            -webkit-tap-highlight-color:transparent;
-            box-shadow:0 4px 8px rgba(0,0,0,0.4);
+            flex: 1;
+            padding: 16px 12px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.1s;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
         }
-        .modal-box .modal-buttons button:active { transform:scale(0.94); }
-        .modal-box .modal-buttons .btn-accept { background:#0f7b3a; color:#e0f2e0; }
-        .modal-box .modal-buttons .btn-reject { background:#7b1f1f; color:#fcd0d0; }
+        .modal-box .modal-buttons button:active { transform: scale(0.94); }
+        .modal-box .modal-buttons .btn-accept { background: #0f7b3a; color: #e0f2e0; }
+        .modal-box .modal-buttons .btn-reject { background: #7b1f1f; color: #fcd0d0; }
 
-        @media (max-width:420px) { .btn-grid .btn { font-size:0.62rem; padding:10px 0; } .header .title { font-size:0.92rem; } table { font-size:0.75rem; } td, th { padding:6px 2px; } .tile .tile-count { font-size:1.1rem; } }
+        /* Panel de Pruebas (Manual Simulator) */
+        .demo-bar {
+            margin-top: 10px;
+            padding: 6px 10px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .demo-bar button {
+            background: #1e3a5a;
+            color: #fff;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 8px;
+            font-size: 0.65rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @media (max-width:420px) { 
+            .btn-grid .btn { font-size: 0.62rem; padding: 10px 0; } 
+            .header .title { font-size: 0.92rem; } 
+            table { font-size: 0.75rem; } 
+            td, th { padding: 6px 2px; } 
+            .tile .tile-count { font-size: 1.1rem; } 
+            .modal-box { padding: 16px 14px; }
+        }
+        @media (min-width:600px) {
+            .modal-box { max-width: 550px; padding: 30px 28px 24px; }
+        }
     </style>
 </head>
 <body>
     <div class="app">
+        <!-- CABECERA -->
         <div class="header">
-            <div class="back">‹</div>
+            <div class="back" id="headerBack">‹</div>
             <div class="title" id="zoneTitle">Z: CARGANDO...</div>
-            <div class="filter">⏷</div>
+            <div class="filter" id="headerFilter">⏷</div>
         </div>
         <div class="header-strip"></div>
         <div class="subbar">
@@ -185,59 +577,155 @@
             </span>
         </div>
 
-        <div class="content">
-            <div class="btn-grid" style="grid-template-columns:1fr 1fr 1fr; gap:10px;">
-                <div class="btn" data-cmd="consulta_ub" style="padding:18px 4px; font-size:0.85rem;">CONSULTA UB</div>
-                <div class="btn" data-cmd="ubicar_parada" style="padding:18px 4px; font-size:0.85rem;">UBICAR PARADA</div>
-                <div class="btn" data-cmd="luces" style="padding:18px 4px; font-size:0.85rem;">LUCES</div>
-            </div>
+        <!-- ======================================================= -->
+        <!-- PANTALLA 1: ESTADO MONITOR                              -->
+        <!-- ======================================================= -->
+        <div id="viewMonitor" class="view-screen active">
+            <div class="content">
+                <div class="btn-grid">
+                    <div class="btn" data-cmd="consulta_ub">CONSULTA UB</div>
+                    <div class="btn" data-cmd="ubicar_parada">UBICAR PARADA</div>
+                    <div class="btn" data-cmd="luces">LUCES</div>
+                </div>
 
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;padding-left:10px;">&nbsp;</th>
-                            <th class="col-p">P</th>
-                            <th class="col-z">Z</th>
-                            <th class="col-s">S</th>
-                            <th class="col-r">R</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
-            </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding-left:10px;">&nbsp;</th>
+                                <th class="col-p">P</th>
+                                <th class="col-z">Z</th>
+                                <th class="col-s">S</th>
+                                <th class="col-r">R</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
 
-            <div class="tiles">
-                <div class="tile">
-                    <div class="tile-icon">🛣️</div>
-                    <div class="tile-count" id="pendientesCount">0</div>
-                    <div class="tile-label">PARADA</div>
+                <div class="tiles">
+                    <div class="tile">
+                        <div class="tile-icon">🛣️</div>
+                        <div class="tile-count" id="pendientesCount">0</div>
+                        <div class="tile-label">PARADA</div>
+                    </div>
+                    <div class="tile" data-cmd="servicios" style="cursor:pointer;">
+                        <div class="tile-icon">🧑‍✈️</div>
+                        <div class="tile-count" id="serviciosCount">0</div>
+                        <div class="tile-label">SERVICIOS</div>
+                    </div>
+                    <div class="tile" data-cmd="vehiculos" style="cursor:pointer;">
+                        <div class="tile-icon">🚕</div>
+                        <div class="tile-count" id="vehiculosCount">0</div>
+                        <div class="tile-label">VEHÍCULOS</div>
+                    </div>
                 </div>
-                <div class="tile" data-cmd="servicios" style="cursor:pointer;">
-                    <div class="tile-icon">🧑‍✈️</div>
-                    <div class="tile-count" id="serviciosCount">0</div>
-                    <div class="tile-label">SERVICIOS</div>
-                </div>
-                <div class="tile" data-cmd="vehiculos" style="cursor:pointer;">
-                    <div class="tile-icon">🚕</div>
-                    <div class="tile-count" id="vehiculosCount">0</div>
-                    <div class="tile-label">VEHÍCULOS</div>
-                </div>
-            </div>
 
-            <div class="foot-strip">
-                <div class="foot-icons">
-                    <span title="Descargar">☁️⬇️</span>
-                    <span title="Enviar">📨</span>
-                    <span title="Escanear">🪪</span>
+                <div class="foot-strip">
+                    <div class="foot-icons">
+                        <span title="Descargar">☁️⬇️</span>
+                        <span title="Enviar">📨</span>
+                        <span title="Escanear">🪪</span>
+                    </div>
+                    <div class="libre-btn" data-cmd="libre" id="libreBtn">LIBRE</div>
                 </div>
-                <div class="libre-btn" data-cmd="libre" id="libreBtn">LIBRE</div>
+
+                <!-- Barra de prueba rápida -->
+                <div class="demo-bar">
+                    <span>Simulación:</span>
+                    <button id="btnTestOferta">⚡ Oferta</button>
+                    <button id="btnTestServicio">🚕 Servicio</button>
+                    <button id="btnTestParada">📍 Parada T4</button>
+                    <button id="btnTestRuta">🕒 Ruta T4</button>
+                    <button id="btnTestMonitor">📊 Monitor</button>
+                </div>
             </div>
         </div>
 
+        <!-- ======================================================= -->
+        <!-- PANTALLA DETALLE DE PARADA                             -->
+        <!-- ======================================================= -->
+        <div id="viewDetalleParada" class="view-screen">
+            <div class="stop-detail-container">
+                <div class="stop-header-title" id="stopHeaderTitle">TERMINAL 4</div>
+                <div class="stop-column-headers">
+                    <span class="col-p-tag">P</span>
+                    <span class="col-z-tag">Z</span>
+                    <span class="col-o-tag">O</span>
+                </div>
+                <div class="stop-list" id="stopCarList">
+                    <!-- Los elementos se cargan dinámicamente -->
+                </div>
+                <div class="stop-bottom-bar">
+                    <div class="stop-bar-blue"></div>
+                    <div class="stop-bar-purple"></div>
+                    <div class="stop-bar-red"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- PANTALLA DETALLE DE SERVICIOS RESERVADOS / RUTAS       -->
+        <!-- ======================================================= -->
+        <div id="viewDetalleServicios" class="view-screen">
+            <div class="route-detail-container">
+                <div class="route-subbar" id="routeZoneName">---</div>
+                <div class="route-list" id="routeList">
+                    <!-- Los servicios con hora se cargan dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- PANTALLA 3: SERVICIO ACEPTADO                           -->
+        <!-- ======================================================= -->
+        <div id="viewServicio" class="view-screen">
+            <div class="service-container">
+                <div class="service-card">
+                    <div class="service-header-row">
+                        <div class="service-number" id="srvNumber">Nº ----</div>
+                        <div class="service-badge" id="srvStatus">DESPACHADO</div>
+                    </div>
+
+                    <div class="service-info-group">
+                        <div class="service-label">Hora de Recogida</div>
+                        <div class="service-value highlight" id="srvTime">--:--</div>
+                    </div>
+
+                    <div class="service-info-group">
+                        <div class="service-label">Zona</div>
+                        <div class="service-value" id="srvZone">---</div>
+                    </div>
+
+                    <div class="service-info-group">
+                        <div class="service-label">Dirección Completa</div>
+                        <div class="service-value" id="srvAddress">---</div>
+                    </div>
+
+                    <div class="service-info-group" style="margin-bottom:0;">
+                        <div class="service-label">Observaciones</div>
+                        <div class="service-obs" id="srvObs">Sin observaciones</div>
+                    </div>
+                </div>
+
+                <!-- Botones exclusivamente visuales (deshabilitados) -->
+                <div class="service-buttons-grid">
+                    <button class="service-btn" disabled>🔔 AVISOS</button>
+                    <button class="service-btn" disabled>🗺️ NAVEGADOR</button>
+                    <button class="service-btn" disabled>👤 CLIENTE</button>
+                    <button class="service-btn" disabled>🖨️ IMPRIMIR</button>
+                    <button class="service-btn" disabled>↩️ DEVOLVER</button>
+                    <button class="service-btn" disabled>❓ ¿HAY CLIENTE?</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICACIÓN TOAST GLOBAL -->
         <div class="toast" id="toast">💡 Esperando datos...</div>
 
-        <!-- MODAL DE DESPACHO -->
+        <!-- ======================================================= -->
+        <!-- MODAL DE DESPACHO (PANTALLA COMPLETA)                   -->
+        <!-- ======================================================= -->
         <div class="modal-overlay" id="modalOverlay">
             <div class="modal-box">
                 <div class="modal-title">
@@ -254,7 +742,62 @@
 
 <script>
     // -------------------------------------------------------------
-    // CONFIGURACIÓN (Webhook actualizado)
+    // REGISTRO DE SERVICE WORKER INLINE (PWA Single-File)
+    // -------------------------------------------------------------
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            self.addEventListener('install', (e) => self.skipWaiting());
+            self.addEventListener('activate', (e) => self.clients.claim());
+            
+            self.addEventListener('notificationclick', (event) => {
+                event.notification.close();
+                const action = event.action;
+                event.waitUntil(
+                    self.clients.matchAll({ type: 'window' }).then((clientList) => {
+                        for (const client of clientList) {
+                            if (client.url && 'focus' in client) {
+                                client.focus();
+                                client.postMessage({ type: 'NOTIFICATION_ACTION', action: action });
+                                return;
+                            }
+                        }
+                        if (self.clients.openWindow) {
+                            return self.clients.openWindow('/');
+                        }
+                    })
+                );
+            });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register(swUrl)
+                .then(reg => {
+                    solicitarPermisoNotificaciones();
+                })
+                .catch(err => console.log('SW fallback active', err));
+        });
+
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'NOTIFICATION_ACTION') {
+                if (event.data.action === 'aceptar') {
+                    sendCommand('despacho_aceptar');
+                    detenerAlertaDespacho();
+                    modalOverlay.classList.remove("active");
+                    setToast("⏳ Esperando datos del servicio...", "warning");
+                } else if (event.data.action === 'rechazar') {
+                    sendCommand('despacho_rechazar');
+                    detenerAlertaDespacho();
+                    modalOverlay.classList.remove("active");
+                    setToast("❌ Despacho rechazado", "error");
+                }
+            }
+        });
+    }
+
+    // -------------------------------------------------------------
+    // CONFIGURACIÓN (Endpoints MacroDroid & Ntfy)
     // -------------------------------------------------------------
     const WEBHOOK_URL = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
     const NTFY_TOPIC = 'smarttd-monitor';
@@ -263,6 +806,12 @@
     // -------------------------------------------------------------
     // REFERENCIAS DOM
     // -------------------------------------------------------------
+    const viewMonitor = document.getElementById('viewMonitor');
+    const viewServicio = document.getElementById('viewServicio');
+    const viewDetalleParada = document.getElementById('viewDetalleParada');
+    const viewDetalleServicios = document.getElementById('viewDetalleServicios');
+    const modalOverlay = document.getElementById('modalOverlay');
+
     const zoneTitleEl = document.getElementById('zoneTitle');
     const tableBody = document.getElementById('tableBody');
     const updateTimeEl = document.getElementById('updateTime');
@@ -274,20 +823,82 @@
     const statusLabel = document.getElementById('statusLabel');
     const libreBtn = document.getElementById('libreBtn');
 
-    const modalOverlay = document.getElementById('modalOverlay');
     const modalContent = document.getElementById('modalContent');
     const modalAccept = document.getElementById('modalAccept');
     const modalReject = document.getElementById('modalReject');
+
+    // Elementos de la pantalla de detalle de parada
+    const stopHeaderTitleEl = document.getElementById('stopHeaderTitle');
+    const stopCarListEl = document.getElementById('stopCarList');
+
+    // Elementos de la pantalla de servicios / rutas
+    const routeZoneNameEl = document.getElementById('routeZoneName');
+    const routeListEl = document.getElementById('routeList');
+
+    // Elementos de la pantalla de servicio
+    const srvNumberEl = document.getElementById('srvNumber');
+    const srvStatusEl = document.getElementById('srvStatus');
+    const srvTimeEl = document.getElementById('srvTime');
+    const srvZoneEl = document.getElementById('srvZone');
+    const srvAddressEl = document.getElementById('srvAddress');
+    const srvObsEl = document.getElementById('srvObs');
 
     let connected = false;
     let lastMessageTime = 0;
     let eventSource = null;
     let audioCtx = null;
-    let despachoAudioInterval = null; // Bucle para la alerta sonora continua
-    let despachoTimeout = null;       // Temporizador para auto-detener tras 30s
+    let despachoAudioInterval = null;
+    let despachoTimeout = null;
 
     // -------------------------------------------------------------
-    // AUDIO Y ALERTA CONTINUA CON TIMEOUT (30s)
+    // MÁQUINA DE ESTADOS DE VISTAS
+    // -------------------------------------------------------------
+    const STATE_MONITOR = 'MONITOR';
+    const STATE_OFERTA = 'OFERTA';
+    const STATE_SERVICIO = 'SERVICIO';
+    const STATE_DETALLE_PARADA = 'DETALLE_PARADA';
+    const STATE_DETALLE_SERVICIOS = 'DETALLE_SERVICIOS';
+
+    let currentViewState = STATE_MONITOR;
+
+    /**
+     * Alterna la pantalla activa de forma limpia garantizando que nunca se solapen
+     */
+    function setViewState(newState) {
+        currentViewState = newState;
+        
+        // Desactivar todas las vistas principales primero
+        viewMonitor.classList.remove('active');
+        viewServicio.classList.remove('active');
+        viewDetalleParada.classList.remove('active');
+        viewDetalleServicios.classList.remove('active');
+
+        if (newState === STATE_MONITOR) {
+            ocultarModal();
+            viewMonitor.classList.add('active');
+        } else if (newState === STATE_SERVICIO) {
+            ocultarModal();
+            viewServicio.classList.add('active');
+        } else if (newState === STATE_DETALLE_PARADA) {
+            ocultarModal();
+            viewDetalleParada.classList.add('active');
+        } else if (newState === STATE_DETALLE_SERVICIOS) {
+            ocultarModal();
+            viewDetalleServicios.classList.add('active');
+        } else if (newState === STATE_OFERTA) {
+            // La oferta es una capa modal sobre la pantalla activa
+            modalOverlay.classList.add('active');
+        }
+    }
+
+    // Botón de cabecera Atrás para volver al monitor
+    document.getElementById('headerBack').addEventListener('click', () => {
+        setViewState(STATE_MONITOR);
+        setToast('📊 Monitor de zonas', 'info');
+    });
+
+    // -------------------------------------------------------------
+    // SISTEMA DE AUDIO (Web Audio API) Y VIBRACIÓN
     // -------------------------------------------------------------
     function initAudio() {
         if (!audioCtx) {
@@ -344,25 +955,21 @@
         } catch (e) {}
     }
 
-    // Iniciar alerta repetitiva (audio + vibración) durante un máximo de 30s
     function iniciarAlertaDespacho() {
-        detenerAlertaDespacho(); // Limpia cualquier bucle o temporizador previo
+        detenerAlertaDespacho();
         reproducirSonido();
         if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
 
-        // Se repite cada 1.3 segundos
         despachoAudioInterval = setInterval(() => {
             reproducirSonido();
             if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
         }, 1300);
 
-        // Temporizador de 30 segundos para detener el sonido/vibración automáticamente
         despachoTimeout = setTimeout(() => {
             detenerAlertaDespacho();
         }, 30000);
     }
 
-    // Detener la alerta sonora y cancelar el temporizador
     function detenerAlertaDespacho() {
         if (despachoAudioInterval) {
             clearInterval(despachoAudioInterval);
@@ -378,7 +985,7 @@
     }
 
     // -------------------------------------------------------------
-    // FUNCIONES AUXILIARES
+    // FUNCIONES AUXILIARES DE UI
     // -------------------------------------------------------------
     function extractZoneName(titleText) {
         if (!titleText) return '';
@@ -420,58 +1027,15 @@
         }
     }
 
-    // -------------------------------------------------------------
-    // MODAL DE DESPACHO
-    // -------------------------------------------------------------
     function escapeHtml(str) {
+        if (typeof str !== 'string') return '';
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
     }
 
-    function renderDespacho(texto) {
-        const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
-
-        const horaZonaIdx = lineas.findIndex(l => /^\d{1,2}:\d{2}\b/.test(l));
-        const horaZona = horaZonaIdx >= 0 ? lineas[horaZonaIdx] : '';
-
-        const direccion = lineas.filter((l, i) =>
-            i !== horaZonaIdx && !/tiene despacho/i.test(l)
-        );
-
-        modalContent.innerHTML = `
-            ${horaZona ? `<div class="despacho-hora">${escapeHtml(horaZona)}</div>` : ''}
-            ${direccion.length ? `<div class="despacho-dir">${direccion.map(escapeHtml).join('<br>')}</div>` : ''}
-            <div class="despacho-pregunta">Tiene Despacho, ¿Lo acepta?</div>
-        `;
-    }
-
-    function mostrarModal(texto) {
-        renderDespacho(texto);
-        modalOverlay.classList.add('active');
-        iniciarAlertaDespacho(); // Inicia la repetición del sonido/vibración (máx. 30 segs)
-        lanzarNotificacionNativa(texto); // Muestra también la notificación del sistema
-    }
-
-    function ocultarModal() {
-        modalOverlay.classList.remove('active');
-        detenerAlertaDespacho();
-    }
-
-    modalAccept.addEventListener('click', function() {
-        sendCommand('despacho_aceptar');
-        ocultarModal();
-        setToast('✅ Despacho aceptado', 'success');
-    });
-
-    modalReject.addEventListener('click', function() {
-        sendCommand('despacho_rechazar');
-        ocultarModal();
-        setToast('❌ Despacho rechazado', 'error');
-    });
-
     // -------------------------------------------------------------
-    // NOTIFICACIONES EN SEGUNDO PLANO (PUSH / NATIVAS)
+    // NOTIFICACIONES PUSH NATIVAS
     // -------------------------------------------------------------
     function solicitarPermisoNotificaciones() {
         if ('Notification' in window && 'serviceWorker' in navigator) {
@@ -506,57 +1070,282 @@
     }
 
     // -------------------------------------------------------------
-    // DETECCIÓN DE DESPACHO
+    // PARSERS INDEPENDIENTES
     // -------------------------------------------------------------
-    function contieneDespacho(valor) {
-        if (typeof valor === 'string') {
-            return valor.includes('Tiene Despacho');
+
+    /**
+     * Parser para la Pantalla de Detalle de Servicios Reservados / Rutas (tvPickupTime, tvZoneName sin tabla)
+     */
+    function parseDetalleServicios(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        const normalized = {};
+        for (const key in data) {
+            let newKey = key.startsWith('ifac.td.smarttd:id/') 
+                ? key.replace('ifac.td.smarttd:id/', '') 
+                : key;
+            normalized[newKey] = data[key];
         }
-        if (Array.isArray(valor)) {
-            return valor.some(item => contieneDespacho(item));
-        }
-        if (valor && typeof valor === 'object') {
-            for (const key in valor) {
-                if (contieneDespacho(valor[key])) return true;
+
+        // Si no tiene hora de recogida o no tiene botones característicos de esta vista
+        if (!normalized.tvPickupTime && !normalized.txButtonText) return null;
+        
+        // Garantizar que no se confunda con el monitor
+        if (normalized.tvOnStop || normalized.tvOnZone) return null;
+
+        const timeKeys = Object.keys(normalized).filter(k => k === 'tvPickupTime' || k.startsWith('tvPickupTime$'));
+        const times = [];
+
+        timeKeys.forEach(key => {
+            let index = 1;
+            if (key.includes('$')) {
+                const match = key.match(/\$(\d+)$/);
+                if (match) index = parseInt(match[1], 10);
             }
-        }
-        return false;
+            times.push({
+                index: index,
+                time: normalized[key]
+            });
+        });
+
+        times.sort((a, b) => a.index - b.index);
+
+        return {
+            title: normalized.tvHeaderText || 'R: RUTA',
+            zoneName: normalized.tvZoneName || '---',
+            times: times
+        };
     }
 
-    function extraerTextoDespacho(valor, acumulado = '') {
-        if (typeof valor === 'string') {
-            if (valor.includes('Tiene Despacho')) {
-                return acumulado + (acumulado ? '\n' : '') + valor;
-            }
-            return acumulado;
+    /**
+     * Parser para la Pantalla de Detalle de Parada / Vehículos (tvCarInfo, tvCarInfo$2...)
+     */
+    function parseDetalleParada(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        const normalized = {};
+        for (const key in data) {
+            let newKey = key.startsWith('ifac.td.smarttd:id/') 
+                ? key.replace('ifac.td.smarttd:id/', '') 
+                : key;
+            normalized[newKey] = data[key];
         }
-        if (Array.isArray(valor)) {
-            let result = acumulado;
-            for (const item of valor) {
-                result = extraerTextoDespacho(item, result);
+
+        const carKeys = Object.keys(normalized).filter(k => k === 'tvCarInfo' || k.startsWith('tvCarInfo$'));
+        if (carKeys.length === 0) return null;
+
+        const carItems = [];
+
+        carKeys.forEach(key => {
+            let index = 1;
+            if (key.includes('$')) {
+                const match = key.match(/\$(\d+)$/);
+                if (match) index = parseInt(match[1], 10);
             }
-            return result;
+            carItems.push({
+                index: index,
+                text: normalized[key]
+            });
+        });
+
+        carItems.sort((a, b) => a.index - b.index);
+
+        return {
+            title: normalized.tvHeaderText || normalized.tvTitle || 'PARADA',
+            cars: carItems
+        };
+    }
+
+    /**
+     * Parser para el Estado 1: Monitor
+     */
+    function parseMonitor(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        const normalized = {};
+        for (const key in data) {
+            let newKey = key.startsWith('ifac.td.smarttd:id/') 
+                ? key.replace('ifac.td.smarttd:id/', '') 
+                : key;
+            normalized[newKey] = data[key];
         }
-        if (valor && typeof valor === 'object') {
-            let result = acumulado;
-            for (const key in valor) {
-                if (key.toLowerCase() === 'distancia' || key.toLowerCase() === 'message') {
-                    const sub = extraerTextoDespacho(valor[key], '');
-                    if (sub) result += (result ? '\n' : '') + sub;
-                } else {
-                    result = extraerTextoDespacho(valor[key], result);
-                }
+
+        // Verificar si contiene los campos requeridos para el monitor
+        const tieneCamposMonitor = Object.keys(normalized).some(k => 
+            k.startsWith('tvZoneName') || k.startsWith('tvOnStop') || 
+            k.startsWith('tvOnZone') || k.startsWith('tvTrips') || k.startsWith('tvHired')
+        );
+
+        if (!tieneCamposMonitor) return null;
+
+        const rowsMap = {};
+        function getRow(idx) {
+            if (!rowsMap[idx]) rowsMap[idx] = { name: '', P: 0, Z: 0, S: 0, R: 0 };
+            return rowsMap[idx];
+        }
+
+        for (const key in normalized) {
+            const val = normalized[key];
+            let idx = -1;
+            if (key === 'tvZoneName') {
+                idx = 0;
+            } else if (key.startsWith('tvZoneName$')) {
+                const match = key.match(/\$(\d+)$/);
+                if (match) idx = Math.max(0, parseInt(match[1], 10) - 1);
             }
-            return result;
+            if (idx >= 0 && val && typeof val === 'string' && val.trim() !== '') {
+                getRow(idx).name = val.trim();
+            }
         }
-        return acumulado;
+
+        for (const key in normalized) {
+            const match = key.match(/\$(\d+)$/);
+            if (!match) continue;
+            const idx = Math.max(0, parseInt(match[1], 10) - 2);
+            const val = normalized[key];
+            if (key.startsWith('tvOnStop')) getRow(idx).P = Number(val) || 0;
+            else if (key.startsWith('tvOnZone')) getRow(idx).Z = Number(val) || 0;
+            else if (key.startsWith('tvHired')) getRow(idx).S = Number(val) || 0;
+            else if (key.startsWith('tvTrips')) getRow(idx).R = Number(val) || 0;
+        }
+
+        const tableData = Object.keys(rowsMap)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(idx => rowsMap[idx])
+            .filter(row => row.name !== '');
+
+        return {
+            headerText: normalized.tvHeaderText || null,
+            bottomBarText: normalized.txInfoStateBottomBar || null,
+            tableData: tableData
+        };
+    }
+
+    /**
+     * Parser para el Estado 2: Oferta de Despacho
+     */
+    function parseOferta(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        const normalized = {};
+
+        for (const key in data) {
+            let newKey = key.startsWith('ifac.td.smarttd:id/')
+                ? key.replace('ifac.td.smarttd:id/', '')
+                : key;
+            normalized[newKey] = data[key];
+        }
+
+        if (
+            !normalized.txInfoAction ||
+            !normalized.txInfoAction.includes("Tiene Despacho")
+        ) {
+            return null;
+        }
+
+        return {
+            hora: normalized.txHour || "--:--",
+            direccion: normalized.txSimpleAdress || "",
+            ciudad: normalized.txCity || "",
+            zona: normalized.txPickUpZone || "",
+            pregunta: normalized.txInfoAction
+        };
+    }
+
+    /**
+     * Parser para el Estado 3: Servicio Aceptado
+     */
+    function parseServicio(data) {
+        if (!data || typeof data !== 'object') return null;
+
+        const normalized = {};
+
+        for (const key in data) {
+            let newKey = key.startsWith('ifac.td.smarttd:id/')
+                ? key.replace('ifac.td.smarttd:id/', '')
+                : key;
+
+            normalized[newKey] = data[key];
+        }
+
+        const numero = normalized.tvDespatchNumber || normalized.tvDispatchNumber;
+
+        if (!numero) return null;
+
+        return {
+            number: numero,
+            pickup: normalized.tvPickup || "",
+            time: normalized.tvPickupTime || "--:--",
+            zone: normalized.tvZona || "",
+            address: normalized.tvPickup || "",
+            notes: normalized.tvText || "",
+            status: normalized.txInfoStateBottomBar || "DESPACHADO"
+        };
     }
 
     // -------------------------------------------------------------
-    // RENDERIZADO TABLA
+    // RENDERS INDEPENDIENTES DE PANTALLAS
     // -------------------------------------------------------------
-    function renderTable(data) {
-        if (!Array.isArray(data) || data.length === 0) return;
+
+    /**
+     * Renderiza la pantalla de Detalle de Servicios Reservados / Rutas
+     */
+    function renderDetalleServicios(routeData) {
+        zoneTitleEl.textContent = routeData.title;
+        routeZoneNameEl.textContent = routeData.zoneName;
+
+        let html = '';
+        routeData.times.forEach(item => {
+            html += `
+                <div class="route-item">
+                    <span>🕒</span>
+                    <span>${escapeHtml(item.time)}</span>
+                </div>
+            `;
+        });
+
+        routeListEl.innerHTML = html;
+        setViewState(STATE_DETALLE_SERVICIOS);
+        setToast(`🕒 Servicios de ruta (${routeData.times.length})`, 'info');
+    }
+
+    /**
+     * Renderiza la pantalla de Detalle de Parada / Vehículos
+     */
+    function renderDetalleParada(stopData) {
+        stopHeaderTitleEl.textContent = stopData.title;
+        zoneTitleEl.textContent = stopData.title;
+
+        let html = '';
+        stopData.cars.forEach(car => {
+            html += `
+                <div class="stop-item">
+                    <span class="stop-item-index">${car.index}</span>
+                    <div class="stop-item-pill">${escapeHtml(car.text)}</div>
+                </div>
+            `;
+        });
+
+        stopCarListEl.innerHTML = html;
+        setViewState(STATE_DETALLE_PARADA);
+        setToast(`📍 Detalle de parada (${stopData.cars.length} vehículos)`, 'info');
+    }
+
+    /**
+     * Renderiza Pantalla 1: Monitor
+     */
+    function renderMonitor(monitorData) {
+        setViewState(STATE_MONITOR);
+
+        if (monitorData.headerText) {
+            zoneTitleEl.textContent = monitorData.headerText;
+        }
+        if (monitorData.bottomBarText) {
+            libreBtn.textContent = monitorData.bottomBarText.toUpperCase();
+        }
+
+        const data = monitorData.tableData || [];
         const currentZone = currentZoneName();
         let html = '';
 
@@ -568,13 +1357,14 @@
             const rClass = Number(row.R) > 0 ? 'num pos-r' : 'num';
 
             html += `<tr class="${isCurrent ? 'current-zone' : ''}">
-                        <td class="row-label">${row.name || 'ZONA'}</td>
-                        <td class="${pClass}">${row.P ?? 0}</td>
-                        <td class="${zClass}">${row.Z ?? 0}</td>
-                        <td class="${sClass}">${row.S ?? 0}</td>
-                        <td class="${rClass}">${row.R ?? 0}</td>
+                        <td class="row-label">${escapeHtml(row.name)}</td>
+                        <td class="${pClass}">${row.P}</td>
+                        <td class="${zClass}">${row.Z}</td>
+                        <td class="${sClass}">${row.S}</td>
+                        <td class="${rClass}">${row.R}</td>
                     </tr>`;
         });
+
         tableBody.innerHTML = html;
 
         const totalP = data.reduce((a, r) => a + (Number(r.P) || 0), 0);
@@ -587,95 +1377,140 @@
         vehiculosEl.textContent = totalZ + totalR;
     }
 
-    // -------------------------------------------------------------
-    // PARSEO
-    // -------------------------------------------------------------
-    function parseMacroDroidInput(inputData) {
-        if (typeof inputData === 'string') {
-            const trimmed = inputData.trim();
-            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                try {
-                    inputData = JSON.parse(trimmed);
-                } catch (e) {
-                    return null;
-                }
-            } else {
-                return null;
-            }
-        }
+    /**
+     * Renderiza Estado 2: Modal de Oferta de Despacho
+     */
+    function renderOferta(ofertaData) {
+        modalContent.innerHTML = `
+            <div class="despacho-hora">${escapeHtml(ofertaData.hora)}</div>
 
-        if (!inputData || typeof inputData !== 'object') return null;
+            <div class="despacho-dir">
+                ${escapeHtml(ofertaData.direccion)}<br>
+                ${escapeHtml(ofertaData.ciudad)}<br>
+                Zona: <b>${escapeHtml(ofertaData.zona)}</b>
+            </div>
 
-        const normalized = {};
-        for (const key in inputData) {
-            let newKey = key;
-            if (key.startsWith('ifac.td.smarttd:id/')) {
-                newKey = key.replace('ifac.td.smarttd:id/', '');
-            }
-            normalized[newKey] = inputData[key];
-        }
+            <div class="despacho-pregunta">
+                ${escapeHtml(ofertaData.pregunta)}
+            </div>
+        `;
 
-        if (normalized.tvHeaderText) {
-            zoneTitleEl.textContent = normalized.tvHeaderText;
-        }
-        if (normalized.txInfoStateBottomBar) {
-            libreBtn.textContent = normalized.txInfoStateBottomBar.toUpperCase();
-        }
+        setViewState(STATE_OFERTA);
 
-        const rowsMap = {};
+        iniciarAlertaDespacho();
 
-        function getRow(idx) {
-            if (!rowsMap[idx]) {
-                rowsMap[idx] = { name: '', P: 0, Z: 0, S: 0, R: 0 };
-            }
-            return rowsMap[idx];
-        }
+        lanzarNotificacionNativa(
+            ofertaData.direccion + " - " + ofertaData.ciudad
+        );
+    }
 
-        for (const key in normalized) {
-            const val = normalized[key];
-            let idx = -1;
-            if (key === 'tvZoneName') {
-                idx = 0;
-            } else if (key.startsWith('tvZoneName$')) {
-                const match = key.match(/\$(\d+)$/);
-                if (match) {
-                    const num = parseInt(match[1], 10);
-                    idx = Math.max(0, num - 1);
-                }
-            }
-            if (idx >= 0 && val && typeof val === 'string' && val.trim() !== '') {
-                getRow(idx).name = val.trim();
-            }
-        }
+    function ocultarModal() {
+        modalOverlay.classList.remove('active');
+        detenerAlertaDespacho();
+    }
 
-        for (const key in normalized) {
-            const match = key.match(/\$(\d+)$/);
-            if (!match) continue;
-            const num = parseInt(match[1], 10);
-            const idx = Math.max(0, num - 2);
-            const val = normalized[key];
-            if (key.startsWith('tvOnStop')) {
-                getRow(idx).P = Number(val) || 0;
-            } else if (key.startsWith('tvOnZone')) {
-                getRow(idx).Z = Number(val) || 0;
-            } else if (key.startsWith('tvHired')) {
-                getRow(idx).S = Number(val) || 0;
-            } else if (key.startsWith('tvTrips')) {
-                getRow(idx).R = Number(val) || 0;
-            }
-        }
+    modalAccept.addEventListener('click', () => {
+        sendCommand("despacho_aceptar");
+        detenerAlertaDespacho();
+        modalOverlay.classList.remove("active");
+        setToast("⏳ Esperando datos del servicio...", "warning");
+    });
 
-        const result = Object.keys(rowsMap)
-            .map(Number)
-            .sort((a, b) => a - b)
-            .map(idx => rowsMap[idx])
-            .filter(row => row.name !== '');
+    modalReject.addEventListener('click', () => {
+        sendCommand("despacho_rechazar");
+        detenerAlertaDespacho();
+        modalOverlay.classList.remove("active");
+        setToast("❌ Despacho rechazado", "error");
+    });
 
-        return result.length > 0 ? result : null;
+    /**
+     * Renderiza Pantalla 3: Servicio Aceptado
+     */
+    function renderServicio(servicioData) {
+        srvNumberEl.textContent = `Nº ${servicioData.number}`;
+        srvStatusEl.textContent = servicioData.status.toUpperCase();
+        srvTimeEl.textContent = servicioData.time;
+        srvZoneEl.textContent = servicioData.zone || "---";
+        srvAddressEl.textContent = servicioData.address || servicioData.pickup || "---";
+        srvObsEl.textContent = servicioData.notes || "Sin observaciones";
+
+        setViewState(STATE_SERVICIO);
+        setToast('🚕 Servicio en curso', 'info');
     }
 
     // -------------------------------------------------------------
-    // ENVÍO DE COMANDOS
+    // PROCESADOR GENERAL DE MENSAJES (DISPATCHER DE ESTADOS)
+    // -------------------------------------------------------------
+    function processIncomingMessage(rawPayload) {
+        let jsonPayload = null;
+
+        if (typeof rawPayload === 'string') {
+            try {
+                jsonPayload = JSON.parse(rawPayload);
+            } catch (_) {
+                jsonPayload = rawPayload;
+            }
+        } else {
+            jsonPayload = rawPayload;
+        }
+
+        // Si el payload viene envuelto por ntfy en .message
+        if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
+            if (typeof jsonPayload.message === 'string') {
+                try {
+                    jsonPayload = JSON.parse(jsonPayload.message);
+                } catch (_) {
+                    jsonPayload = jsonPayload.message;
+                }
+            } else {
+                jsonPayload = jsonPayload.message;
+            }
+        }
+
+        // Evaluamos en orden de prioridad de la máquina de estados
+        
+        // 1. ¿Es una Oferta de Despacho?
+        const ofertaParsed = parseOferta(jsonPayload);
+        if (ofertaParsed) {
+            renderOferta(ofertaParsed);
+            return;
+        }
+
+        // 2. ¿Es un Servicio Aceptado/Asignado?
+        const servicioParsed = parseServicio(jsonPayload);
+        if (servicioParsed) {
+            renderServicio(servicioParsed);
+            return;
+        }
+
+        // 3. ¿Es un detalle de Servicios Reservados / Rutas?
+        const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
+        if (detalleServiciosParsed) {
+            renderDetalleServicios(detalleServiciosParsed);
+            updateTimestamp();
+            return;
+        }
+
+        // 4. ¿Es una lista de Detalle de Parada / Vehículos?
+        const detalleParadaParsed = parseDetalleParada(jsonPayload);
+        if (detalleParadaParsed) {
+            renderDetalleParada(detalleParadaParsed);
+            updateTimestamp();
+            return;
+        }
+
+        // 5. ¿Es una actualización del Monitor?
+        const monitorParsed = parseMonitor(jsonPayload);
+        if (monitorParsed) {
+            renderMonitor(monitorParsed);
+            updateTimestamp();
+            setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
+            return;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // ENVÍO DE COMANDOS WEBHOOK
     // -------------------------------------------------------------
     function sendCommand(cmd) {
         if (!cmd) return;
@@ -696,7 +1531,7 @@
     });
 
     // -------------------------------------------------------------
-    // CONEXIÓN A NTFY
+    // CONEXIÓN A NTFY SSE
     // -------------------------------------------------------------
     function connectToNtfy() {
         setToast('🔄 Conectando a ntfy.sh...', 'info');
@@ -717,78 +1552,12 @@
             };
 
             eventSource.onmessage = function(event) {
-                try {
-                    const raw = event.data;
-                    if (raw === 'ping' || raw === 'keepalive') return;
-                    lastMessageTime = Date.now();
-
-                    let esDespacho = false;
-                    let textoDespacho = '';
-
-                    let parsedJson = null;
-                    try {
-                        parsedJson = JSON.parse(raw);
-                    } catch (_) {}
-
-                    if (parsedJson) {
-                        esDespacho = contieneDespacho(parsedJson);
-                        if (esDespacho) {
-                            textoDespacho = extraerTextoDespacho(parsedJson);
-                            if (!textoDespacho) {
-                                textoDespacho = JSON.stringify(parsedJson, null, 2);
-                            }
-                        }
-                    } else {
-                        if (typeof raw === 'string' && raw.includes('Tiene Despacho')) {
-                            esDespacho = true;
-                            textoDespacho = raw;
-                        }
-                    }
-
-                    if (esDespacho) {
-                        mostrarModal(textoDespacho);
-                        setToast('📨 ¡Nuevo despacho!', 'warning');
-                        return;
-                    }
-
-                    let payload = null;
-                    if (parsedJson) {
-                        if (parsedJson.message) {
-                            if (typeof parsedJson.message === 'string') {
-                                const trimmed = parsedJson.message.trim();
-                                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                                    try {
-                                        payload = JSON.parse(trimmed);
-                                    } catch (_) {
-                                        payload = trimmed;
-                                    }
-                                } else {
-                                    return;
-                                }
-                            } else {
-                                payload = parsedJson.message;
-                            }
-                        } else {
-                            payload = parsedJson;
-                        }
-                    } else {
-                        payload = raw;
-                    }
-
-                    if (!payload) return;
-
-                    const parsedData = parseMacroDroidInput(payload);
-                    if (parsedData && parsedData.length > 0) {
-                        renderTable(parsedData);
-                        updateTimestamp();
-                        setStatus(true, 'Conectado');
-                        setToast(`✅ ${parsedData.length} filas cargadas`, 'success');
-                    } else {
-                        if (typeof payload === 'object') {
-                            setToast('⚠️ Datos no reconocidos', 'warning');
-                        }
-                    }
-                } catch (e) {}
+                const raw = event.data;
+                if (raw === 'ping' || raw === 'keepalive') return;
+                lastMessageTime = Date.now();
+                setStatus(true, 'Conectado');
+                
+                processIncomingMessage(raw);
             };
 
             eventSource.onerror = function() {
@@ -815,46 +1584,88 @@
     }
 
     // -------------------------------------------------------------
-    // PRUEBA MANUAL (Triple clic en el título de la zona)
+    // CONTROLES MANUALES Y DE PRUEBA
     // -------------------------------------------------------------
+    document.getElementById('btnTestOferta').addEventListener('click', () => {
+        processIncomingMessage({
+            txInfoAction: "Tiene Despacho",
+            txHour: "10:20",
+            txSimpleAdress: "Avenida del Ensanche de Vallecas, 102",
+            txCity: "Madrid",
+            txPickUpZone: "ENSANCHE VALL"
+        });
+    });
+
+    document.getElementById('btnTestServicio').addEventListener('click', () => {
+        processIncomingMessage({
+            tvDespatchNumber: "84920",
+            tvPickupTime: "12:45",
+            tvPickup: "Calle de Alcalá, 42",
+            tvZona: "CENTRO - RETIRO",
+            tvText: "Pasar a recoger en la puerta principal. Cliente paga con tarjeta.",
+            txInfoStateBottomBar: "DESPACHADO"
+        });
+    });
+
+    document.getElementById('btnTestParada').addEventListener('click', () => {
+        processIncomingMessage({
+            tvHeaderText: "P: TERMINAL 4 - 19",
+            tvCarInfo: "5504-17:06",
+            "tvCarInfo$2": "1890-17:10",
+            "tvCarInfo$3": "G-3344--17:13",
+            "tvCarInfo$4": "€6-5593--17:16",
+            "tvCarInfo$5": "€8-3328--17:19",
+            "tvCarInfo$6": "3778-17:21",
+            "tvCarInfo$7": "5178-17:22",
+            "tvCarInfo$8": "3072-17:23",
+            "tvCarInfo$9": "6-1266--17:23",
+            "tvCarInfo$10": "5733-17:23"
+        });
+    });
+
+    document.getElementById('btnTestRuta').addEventListener('click', () => {
+        processIncomingMessage({
+            tvHeaderText: "R: TERMINAL 4 - 18",
+            tvPickupTime: "19:10",
+            tvZoneName: "G. NOBLEJAS",
+            txButtonText: "VOLVER",
+            "txButtonText$2": "VER TODOS",
+            "txButtonText$3": "CERRAR",
+            txInfoStateBottomBar: "LIBRE"
+        });
+    });
+
+    document.getElementById('btnTestMonitor').addEventListener('click', () => {
+        processIncomingMessage({
+            tvHeaderText: "Z: ENSANCHE VALL",
+            txInfoStateBottomBar: "LIBRE",
+            tvZoneName: "ENSANCHE VALL",
+            tvOnStop: "2", tvOnZone: "6", tvHired: "1", tvTrips: "10",
+            "tvZoneName$1": "VILLA VALLECAS",
+            "tvOnStop$1": "0", "tvOnZone$1": "4", "tvHired$1": "0", "tvTrips$1": "5"
+        });
+    });
+
+    // Triple click en título para disparar prueba de despacho rápida
     let titleClicks = 0;
     zoneTitleEl.addEventListener('click', function() {
         titleClicks++;
         if (titleClicks >= 3) {
             titleClicks = 0;
-            const testMsg = `10:20 ENSANCHE VALL\n\nAvenida del Ensanche de Vallecas, 102\nMadrid-Madrid\nTiene Despacho`;
-            mostrarModal(testMsg);
-            setToast('🔔 Prueba de despacho', 'warning');
+            processIncomingMessage({
+                txInfoAction: "Tiene Despacho",
+                txHour: "10:20",
+                txSimpleAdress: "Avenida del Ensanche de Vallecas, 102",
+                txCity: "Madrid",
+                txPickUpZone: "ENSANCHE VALL"
+            });
         }
     });
 
     // -------------------------------------------------------------
-    // INICIO
-    // -------------------------------------------------------------
-    renderTable([]);
-    updateTimestamp();
-    connectToNtfy();
-    setInterval(updateTimestamp, 2000);
-
-    // -------------------------------------------------------------
-    // PWA & NOTIFICACIONES PUSH
-    // -------------------------------------------------------------
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(reg => {
-                    console.log('SW registrado correctamente:', reg.scope);
-                    solicitarPermisoNotificaciones();
-                })
-                .catch(err => console.warn('Error al registrar SW:', err));
-        });
-    }
-
-    // -------------------------------------------------------------
-    // WAKE LOCK: evita apagar la pantalla en primer plano
+    // WAKE LOCK (Mantener Pantalla Encendida)
     // -------------------------------------------------------------
     let wakeLock = null;
-
     async function solicitarWakeLock() {
         if (!('wakeLock' in navigator)) return;
         try {
@@ -868,6 +1679,13 @@
         }
     });
 
+    // -------------------------------------------------------------
+    // INICIALIZACIÓN DE LA APLICACIÓN
+    // -------------------------------------------------------------
+    renderMonitor({ tableData: [] });
+    updateTimestamp();
+    connectToNtfy();
+    setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
 </script>
 </body>
