@@ -113,7 +113,6 @@
             justify-content:center;
             align-items:center;
         }
-        /* Botón de cierre eliminado a propósito: el despacho exige respuesta explícita (Cancelar/Aceptar) */
         .modal-box .modal-content {
             flex:1;
             overflow-y:auto;
@@ -214,13 +213,11 @@
                     <div class="tile-count" id="pendientesCount">0</div>
                     <div class="tile-label">PARADA</div>
                 </div>
-                <!-- Tile SERVICIOS ahora es un botón -->
                 <div class="tile" data-cmd="servicios" style="cursor:pointer;">
                     <div class="tile-icon">🧑‍✈️</div>
                     <div class="tile-count" id="serviciosCount">0</div>
                     <div class="tile-label">SERVICIOS</div>
                 </div>
-                <!-- Tile VEHÍCULOS sigue siendo botón -->
                 <div class="tile" data-cmd="vehiculos" style="cursor:pointer;">
                     <div class="tile-icon">🚕</div>
                     <div class="tile-count" id="vehiculosCount">0</div>
@@ -255,579 +252,623 @@
         </div>
     </div>
 
-    <script>
-        // -------------------------------------------------------------
-        // CONFIGURACIÓN (Webhook actualizado)
-        // -------------------------------------------------------------
-        const WEBHOOK_URL = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
-        const NTFY_TOPIC = 'smarttd-monitor';
-        const NTFY_SSE_URL = `https://ntfy.sh/${NTFY_TOPIC}/sse`;
+<script>
+    // -------------------------------------------------------------
+    // CONFIGURACIÓN (Webhook actualizado)
+    // -------------------------------------------------------------
+    const WEBHOOK_URL = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
+    const NTFY_TOPIC = 'smarttd-monitor';
+    const NTFY_SSE_URL = `https://ntfy.sh/${NTFY_TOPIC}/sse`;
 
-        // -------------------------------------------------------------
-        // REFERENCIAS DOM
-        // -------------------------------------------------------------
-        const zoneTitleEl = document.getElementById('zoneTitle');
-        const tableBody = document.getElementById('tableBody');
-        const updateTimeEl = document.getElementById('updateTime');
-        const pendientesEl = document.getElementById('pendientesCount');
-        const serviciosEl = document.getElementById('serviciosCount');
-        const vehiculosEl = document.getElementById('vehiculosCount');
-        const toastEl = document.getElementById('toast');
-        const statusDot = document.getElementById('statusDot');
-        const statusLabel = document.getElementById('statusLabel');
-        const libreBtn = document.getElementById('libreBtn');
+    // -------------------------------------------------------------
+    // REFERENCIAS DOM
+    // -------------------------------------------------------------
+    const zoneTitleEl = document.getElementById('zoneTitle');
+    const tableBody = document.getElementById('tableBody');
+    const updateTimeEl = document.getElementById('updateTime');
+    const pendientesEl = document.getElementById('pendientesCount');
+    const serviciosEl = document.getElementById('serviciosCount');
+    const vehiculosEl = document.getElementById('vehiculosCount');
+    const toastEl = document.getElementById('toast');
+    const statusDot = document.getElementById('statusDot');
+    const statusLabel = document.getElementById('statusLabel');
+    const libreBtn = document.getElementById('libreBtn');
 
-        const modalOverlay = document.getElementById('modalOverlay');
-        const modalContent = document.getElementById('modalContent');
-        const modalAccept = document.getElementById('modalAccept');
-        const modalReject = document.getElementById('modalReject');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalContent = document.getElementById('modalContent');
+    const modalAccept = document.getElementById('modalAccept');
+    const modalReject = document.getElementById('modalReject');
 
-        let connected = false;
-        let lastMessageTime = 0;
-        let eventSource = null;
-        let audioCtx = null;
+    let connected = false;
+    let lastMessageTime = 0;
+    let eventSource = null;
+    let audioCtx = null;
+    let despachoAudioInterval = null; // Bucle para la alerta sonora continua
+    let despachoTimeout = null;       // Temporizador para auto-detener tras 30s
 
-        // -------------------------------------------------------------
-        // AUDIO (alerta acústica)
-        // -------------------------------------------------------------
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().catch(() => {});
-            }
+    // -------------------------------------------------------------
+    // AUDIO Y ALERTA CONTINUA CON TIMEOUT (30s)
+    // -------------------------------------------------------------
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+    }
 
-        document.addEventListener('click', initAudio, { once: true });
-        document.addEventListener('touchstart', initAudio, { once: true });
+    document.addEventListener('click', initAudio, { once: true });
+    document.addEventListener('touchstart', initAudio, { once: true });
 
-        function reproducirSonido() {
-            try {
-                initAudio();
-                if (!audioCtx || audioCtx.state !== 'running') {
-                    audioCtx.resume().then(() => tocarPitido()).catch(() => {});
-                    return;
+    function reproducirSonido() {
+        try {
+            initAudio();
+            if (!audioCtx || audioCtx.state !== 'running') {
+                audioCtx.resume().then(() => tocarPitido()).catch(() => {});
+                return;
+            }
+            tocarPitido();
+        } catch (e) {
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        }
+    }
+
+    function tocarPitido() {
+        try {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.value = 880;
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.6);
+
+            setTimeout(() => {
+                try {
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.type = 'square';
+                    osc2.frequency.value = 660;
+                    gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.start();
+                    osc2.stop(audioCtx.currentTime + 0.5);
+                } catch (_) {}
+            }, 300);
+        } catch (e) {}
+    }
+
+    // Iniciar alerta repetitiva (audio + vibración) durante un máximo de 30s
+    function iniciarAlertaDespacho() {
+        detenerAlertaDespacho(); // Limpia cualquier bucle o temporizador previo
+        reproducirSonido();
+        if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+
+        // Se repite cada 1.3 segundos
+        despachoAudioInterval = setInterval(() => {
+            reproducirSonido();
+            if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+        }, 1300);
+
+        // Temporizador de 30 segundos para detener el sonido/vibración automáticamente
+        despachoTimeout = setTimeout(() => {
+            detenerAlertaDespacho();
+        }, 30000);
+    }
+
+    // Detener la alerta sonora y cancelar el temporizador
+    function detenerAlertaDespacho() {
+        if (despachoAudioInterval) {
+            clearInterval(despachoAudioInterval);
+            despachoAudioInterval = null;
+        }
+        if (despachoTimeout) {
+            clearTimeout(despachoTimeout);
+            despachoTimeout = null;
+        }
+        if (navigator.vibrate) {
+            navigator.vibrate(0);
+        }
+    }
+
+    // -------------------------------------------------------------
+    // FUNCIONES AUXILIARES
+    // -------------------------------------------------------------
+    function extractZoneName(titleText) {
+        if (!titleText) return '';
+        const match = titleText.match(/(?:[A-Z]:\s*)?(.+?)(?:\s*-\s*\d+)?$/i);
+        return match ? match[1].trim().toUpperCase() : titleText.trim().toUpperCase();
+    }
+
+    function currentZoneName() {
+        return extractZoneName(zoneTitleEl.textContent);
+    }
+
+    function updateTimestamp() {
+        const now = new Date();
+        updateTimeEl.textContent = '🕒 ' + now.toLocaleTimeString('es-ES', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    function setToast(msg, type = 'info') {
+        toastEl.textContent = msg;
+        toastEl.className = 'toast';
+        if (type === 'success') toastEl.classList.add('success');
+        else if (type === 'error') toastEl.classList.add('error');
+        else if (type === 'warning') toastEl.classList.add('warning');
+    }
+
+    function setStatus(online, label) {
+        connected = online;
+        if (online) {
+            statusDot.className = 'dot online';
+            statusLabel.className = 'status-badge online';
+            statusLabel.textContent = label || 'Conectado';
+        } else {
+            statusDot.className = 'dot offline';
+            statusLabel.className = 'status-badge offline';
+            statusLabel.textContent = label || 'NO CONECTADO';
+        }
+    }
+
+    // -------------------------------------------------------------
+    // MODAL DE DESPACHO
+    // -------------------------------------------------------------
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function renderDespacho(texto) {
+        const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+
+        const horaZonaIdx = lineas.findIndex(l => /^\d{1,2}:\d{2}\b/.test(l));
+        const horaZona = horaZonaIdx >= 0 ? lineas[horaZonaIdx] : '';
+
+        const direccion = lineas.filter((l, i) =>
+            i !== horaZonaIdx && !/tiene despacho/i.test(l)
+        );
+
+        modalContent.innerHTML = `
+            ${horaZona ? `<div class="despacho-hora">${escapeHtml(horaZona)}</div>` : ''}
+            ${direccion.length ? `<div class="despacho-dir">${direccion.map(escapeHtml).join('<br>')}</div>` : ''}
+            <div class="despacho-pregunta">Tiene Despacho, ¿Lo acepta?</div>
+        `;
+    }
+
+    function mostrarModal(texto) {
+        renderDespacho(texto);
+        modalOverlay.classList.add('active');
+        iniciarAlertaDespacho(); // Inicia la repetición del sonido/vibración (máx. 30 segs)
+        lanzarNotificacionNativa(texto); // Muestra también la notificación del sistema
+    }
+
+    function ocultarModal() {
+        modalOverlay.classList.remove('active');
+        detenerAlertaDespacho();
+    }
+
+    modalAccept.addEventListener('click', function() {
+        sendCommand('despacho_aceptar');
+        ocultarModal();
+        setToast('✅ Despacho aceptado', 'success');
+    });
+
+    modalReject.addEventListener('click', function() {
+        sendCommand('despacho_rechazar');
+        ocultarModal();
+        setToast('❌ Despacho rechazado', 'error');
+    });
+
+    // -------------------------------------------------------------
+    // NOTIFICACIONES EN SEGUNDO PLANO (PUSH / NATIVAS)
+    // -------------------------------------------------------------
+    function solicitarPermisoNotificaciones() {
+        if ('Notification' in window && 'serviceWorker' in navigator) {
+            Notification.requestPermission().then((permission) => {
+                if (permission === 'granted') {
+                    setToast('🔔 Avisos en 2º plano activados', 'success');
+                } else if (permission === 'denied') {
+                    setToast('⚠️ Notificaciones bloqueadas', 'error');
                 }
-                tocarPitido();
-            } catch (e) {
-                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            }
-        }
-
-        function tocarPitido() {
-            try {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'square';
-                osc.frequency.value = 880;
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.6);
-                setTimeout(() => {
-                    try {
-                        const osc2 = audioCtx.createOscillator();
-                        const gain2 = audioCtx.createGain();
-                        osc2.type = 'square';
-                        osc2.frequency.value = 660;
-                        gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-                        osc2.connect(gain2);
-                        gain2.connect(audioCtx.destination);
-                        osc2.start();
-                        osc2.stop(audioCtx.currentTime + 0.5);
-                    } catch (_) {}
-                }, 300);
-            } catch (e) {}
-        }
-
-        // -------------------------------------------------------------
-        // FUNCIONES AUXILIARES
-        // -------------------------------------------------------------
-        function extractZoneName(titleText) {
-            if (!titleText) return '';
-            const match = titleText.match(/(?:[A-Z]:\s*)?(.+?)(?:\s*-\s*\d+)?$/i);
-            return match ? match[1].trim().toUpperCase() : titleText.trim().toUpperCase();
-        }
-
-        function currentZoneName() {
-            return extractZoneName(zoneTitleEl.textContent);
-        }
-
-        function updateTimestamp() {
-            const now = new Date();
-            updateTimeEl.textContent = '🕒 ' + now.toLocaleTimeString('es-ES', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
             });
         }
+    }
 
-        function setToast(msg, type = 'info') {
-            toastEl.textContent = msg;
-            toastEl.className = 'toast';
-            if (type === 'success') toastEl.classList.add('success');
-            else if (type === 'error') toastEl.classList.add('error');
-            else if (type === 'warning') toastEl.classList.add('warning');
+    function lanzarNotificacionNativa(texto) {
+        if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification('📨 NUEVO DESPACHO', {
+                    body: texto,
+                    icon: 'icon-192.png',
+                    badge: 'icon-192.png',
+                    vibrate: [500, 200, 500, 200, 500],
+                    tag: 'despacho-alert',
+                    renotify: true,
+                    requireInteraction: true,
+                    actions: [
+                        { action: 'aceptar', title: '✅ ACEPTAR' },
+                        { action: 'rechazar', title: '❌ RECHAZAR' }
+                    ]
+                });
+            });
         }
+    }
 
-        function setStatus(online, label) {
-            connected = online;
-            if (online) {
-                statusDot.className = 'dot online';
-                statusLabel.className = 'status-badge online';
-                statusLabel.textContent = label || 'Conectado';
-            } else {
-                statusDot.className = 'dot offline';
-                statusLabel.className = 'status-badge offline';
-                statusLabel.textContent = label || 'NO CONECTADO';
+    // -------------------------------------------------------------
+    // DETECCIÓN DE DESPACHO
+    // -------------------------------------------------------------
+    function contieneDespacho(valor) {
+        if (typeof valor === 'string') {
+            return valor.includes('Tiene Despacho');
+        }
+        if (Array.isArray(valor)) {
+            return valor.some(item => contieneDespacho(item));
+        }
+        if (valor && typeof valor === 'object') {
+            for (const key in valor) {
+                if (contieneDespacho(valor[key])) return true;
             }
         }
+        return false;
+    }
 
-        // -------------------------------------------------------------
-        // MODAL DE DESPACHO
-        // -------------------------------------------------------------
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
-        // Convierte el texto crudo del despacho (ej: "10:20 ENSANCHE VALL\nAvenida...\nMadrid-Madrid\nTiene Despacho")
-        // en la estructura visual de la app original: hora+zona, dirección, pregunta de confirmación.
-        function renderDespacho(texto) {
-            const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
-
-            const horaZonaIdx = lineas.findIndex(l => /^\d{1,2}:\d{2}\b/.test(l));
-            const horaZona = horaZonaIdx >= 0 ? lineas[horaZonaIdx] : '';
-
-            const direccion = lineas.filter((l, i) =>
-                i !== horaZonaIdx && !/tiene despacho/i.test(l)
-            );
-
-            modalContent.innerHTML = `
-                ${horaZona ? `<div class="despacho-hora">${escapeHtml(horaZona)}</div>` : ''}
-                ${direccion.length ? `<div class="despacho-dir">${direccion.map(escapeHtml).join('<br>')}</div>` : ''}
-                <div class="despacho-pregunta">Tiene Despacho, ¿Lo acepta?</div>
-            `;
-        }
-
-        function mostrarModal(texto) {
-            renderDespacho(texto);
-            modalOverlay.classList.add('active');
-        }
-
-        function ocultarModal() {
-            modalOverlay.classList.remove('active');
-        }
-
-        modalAccept.addEventListener('click', function() {
-            sendCommand('despacho_aceptar');
-            ocultarModal();
-            setToast('✅ Despacho aceptado', 'success');
-        });
-
-        modalReject.addEventListener('click', function() {
-            sendCommand('despacho_rechazar');
-            ocultarModal();
-            setToast('❌ Despacho rechazado', 'error');
-        });
-
-        // Nota: se retiró a propósito el cierre por botón "✕" y por toque fuera del modal.
-        // El despacho requiere una respuesta explícita (Cancelar/Aceptar), igual que en la app original.
-
-        // -------------------------------------------------------------
-        // DETECCIÓN DE DESPACHO
-        // -------------------------------------------------------------
-        function contieneDespacho(valor) {
-            if (typeof valor === 'string') {
-                return valor.includes('Tiene Despacho');
-            }
-            if (Array.isArray(valor)) {
-                return valor.some(item => contieneDespacho(item));
-            }
-            if (valor && typeof valor === 'object') {
-                for (const key in valor) {
-                    if (contieneDespacho(valor[key])) return true;
-                }
-            }
-            return false;
-        }
-
-        function extraerTextoDespacho(valor, acumulado = '') {
-            if (typeof valor === 'string') {
-                if (valor.includes('Tiene Despacho')) {
-                    return acumulado + (acumulado ? '\n' : '') + valor;
-                }
-                return acumulado;
-            }
-            if (Array.isArray(valor)) {
-                let result = acumulado;
-                for (const item of valor) {
-                    result = extraerTextoDespacho(item, result);
-                }
-                return result;
-            }
-            if (valor && typeof valor === 'object') {
-                let result = acumulado;
-                for (const key in valor) {
-                    if (key.toLowerCase() === 'distancia' || key.toLowerCase() === 'message') {
-                        const sub = extraerTextoDespacho(valor[key], '');
-                        if (sub) result += (result ? '\n' : '') + sub;
-                    } else {
-                        result = extraerTextoDespacho(valor[key], result);
-                    }
-                }
-                return result;
+    function extraerTextoDespacho(valor, acumulado = '') {
+        if (typeof valor === 'string') {
+            if (valor.includes('Tiene Despacho')) {
+                return acumulado + (acumulado ? '\n' : '') + valor;
             }
             return acumulado;
         }
-
-        // -------------------------------------------------------------
-        // RENDERIZADO TABLA
-        // -------------------------------------------------------------
-        function renderTable(data) {
-            if (!Array.isArray(data) || data.length === 0) return;
-            const currentZone = currentZoneName();
-            let html = '';
-
-            data.forEach(row => {
-                const isCurrent = (row.name || '').trim().toUpperCase() === currentZone;
-                const pClass = Number(row.P) > 0 ? 'num pos-p' : 'num';
-                const zClass = Number(row.Z) > 0 ? 'num pos-z' : 'num';
-                const sClass = Number(row.S) > 0 ? 'num pos-s' : 'num';
-                const rClass = Number(row.R) > 0 ? 'num pos-r' : 'num';
-
-                html += `<tr class="${isCurrent ? 'current-zone' : ''}">
-                            <td class="row-label">${row.name || 'ZONA'}</td>
-                            <td class="${pClass}">${row.P ?? 0}</td>
-                            <td class="${zClass}">${row.Z ?? 0}</td>
-                            <td class="${sClass}">${row.S ?? 0}</td>
-                            <td class="${rClass}">${row.R ?? 0}</td>
-                        </tr>`;
-            });
-            tableBody.innerHTML = html;
-
-            const totalP = data.reduce((a, r) => a + (Number(r.P) || 0), 0);
-            const totalZ = data.reduce((a, r) => a + (Number(r.Z) || 0), 0);
-            const totalS = data.reduce((a, r) => a + (Number(r.S) || 0), 0);
-            const totalR = data.reduce((a, r) => a + (Number(r.R) || 0), 0);
-
-            pendientesEl.textContent = totalP;
-            serviciosEl.textContent = totalS;
-            vehiculosEl.textContent = totalZ + totalR;
+        if (Array.isArray(valor)) {
+            let result = acumulado;
+            for (const item of valor) {
+                result = extraerTextoDespacho(item, result);
+            }
+            return result;
         }
-
-        // -------------------------------------------------------------
-        // PARSEO
-        // -------------------------------------------------------------
-        function parseMacroDroidInput(inputData) {
-            if (typeof inputData === 'string') {
-                const trimmed = inputData.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    try {
-                        inputData = JSON.parse(trimmed);
-                    } catch (e) {
-                        return null;
-                    }
+        if (valor && typeof valor === 'object') {
+            let result = acumulado;
+            for (const key in valor) {
+                if (key.toLowerCase() === 'distancia' || key.toLowerCase() === 'message') {
+                    const sub = extraerTextoDespacho(valor[key], '');
+                    if (sub) result += (result ? '\n' : '') + sub;
                 } else {
+                    result = extraerTextoDespacho(valor[key], result);
+                }
+            }
+            return result;
+        }
+        return acumulado;
+    }
+
+    // -------------------------------------------------------------
+    // RENDERIZADO TABLA
+    // -------------------------------------------------------------
+    function renderTable(data) {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const currentZone = currentZoneName();
+        let html = '';
+
+        data.forEach(row => {
+            const isCurrent = (row.name || '').trim().toUpperCase() === currentZone;
+            const pClass = Number(row.P) > 0 ? 'num pos-p' : 'num';
+            const zClass = Number(row.Z) > 0 ? 'num pos-z' : 'num';
+            const sClass = Number(row.S) > 0 ? 'num pos-s' : 'num';
+            const rClass = Number(row.R) > 0 ? 'num pos-r' : 'num';
+
+            html += `<tr class="${isCurrent ? 'current-zone' : ''}">
+                        <td class="row-label">${row.name || 'ZONA'}</td>
+                        <td class="${pClass}">${row.P ?? 0}</td>
+                        <td class="${zClass}">${row.Z ?? 0}</td>
+                        <td class="${sClass}">${row.S ?? 0}</td>
+                        <td class="${rClass}">${row.R ?? 0}</td>
+                    </tr>`;
+        });
+        tableBody.innerHTML = html;
+
+        const totalP = data.reduce((a, r) => a + (Number(r.P) || 0), 0);
+        const totalZ = data.reduce((a, r) => a + (Number(r.Z) || 0), 0);
+        const totalS = data.reduce((a, r) => a + (Number(r.S) || 0), 0);
+        const totalR = data.reduce((a, r) => a + (Number(r.R) || 0), 0);
+
+        pendientesEl.textContent = totalP;
+        serviciosEl.textContent = totalS;
+        vehiculosEl.textContent = totalZ + totalR;
+    }
+
+    // -------------------------------------------------------------
+    // PARSEO
+    // -------------------------------------------------------------
+    function parseMacroDroidInput(inputData) {
+        if (typeof inputData === 'string') {
+            const trimmed = inputData.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                try {
+                    inputData = JSON.parse(trimmed);
+                } catch (e) {
                     return null;
                 }
+            } else {
+                return null;
             }
+        }
 
-            if (!inputData || typeof inputData !== 'object') return null;
+        if (!inputData || typeof inputData !== 'object') return null;
 
-            const normalized = {};
-            for (const key in inputData) {
-                let newKey = key;
-                if (key.startsWith('ifac.td.smarttd:id/')) {
-                    newKey = key.replace('ifac.td.smarttd:id/', '');
-                }
-                normalized[newKey] = inputData[key];
+        const normalized = {};
+        for (const key in inputData) {
+            let newKey = key;
+            if (key.startsWith('ifac.td.smarttd:id/')) {
+                newKey = key.replace('ifac.td.smarttd:id/', '');
             }
+            normalized[newKey] = inputData[key];
+        }
 
-            if (normalized.tvHeaderText) {
-                zoneTitleEl.textContent = normalized.tvHeaderText;
+        if (normalized.tvHeaderText) {
+            zoneTitleEl.textContent = normalized.tvHeaderText;
+        }
+        if (normalized.txInfoStateBottomBar) {
+            libreBtn.textContent = normalized.txInfoStateBottomBar.toUpperCase();
+        }
+
+        const rowsMap = {};
+
+        function getRow(idx) {
+            if (!rowsMap[idx]) {
+                rowsMap[idx] = { name: '', P: 0, Z: 0, S: 0, R: 0 };
             }
-            if (normalized.txInfoStateBottomBar) {
-                libreBtn.textContent = normalized.txInfoStateBottomBar.toUpperCase();
-            }
+            return rowsMap[idx];
+        }
 
-            const rowsMap = {};
-
-            function getRow(idx) {
-                if (!rowsMap[idx]) {
-                    rowsMap[idx] = { name: '', P: 0, Z: 0, S: 0, R: 0 };
-                }
-                return rowsMap[idx];
-            }
-
-            for (const key in normalized) {
-                const val = normalized[key];
-                let idx = -1;
-                if (key === 'tvZoneName') {
-                    idx = 0;
-                } else if (key.startsWith('tvZoneName$')) {
-                    const match = key.match(/\$(\d+)$/);
-                    if (match) {
-                        const num = parseInt(match[1], 10);
-                        idx = Math.max(0, num - 1);
-                    }
-                }
-                if (idx >= 0 && val && typeof val === 'string' && val.trim() !== '') {
-                    getRow(idx).name = val.trim();
-                }
-            }
-
-            for (const key in normalized) {
+        for (const key in normalized) {
+            const val = normalized[key];
+            let idx = -1;
+            if (key === 'tvZoneName') {
+                idx = 0;
+            } else if (key.startsWith('tvZoneName$')) {
                 const match = key.match(/\$(\d+)$/);
-                if (!match) continue;
-                const num = parseInt(match[1], 10);
-                const idx = Math.max(0, num - 2);
-                const val = normalized[key];
-                if (key.startsWith('tvOnStop')) {
-                    getRow(idx).P = Number(val) || 0;
-                } else if (key.startsWith('tvOnZone')) {
-                    getRow(idx).Z = Number(val) || 0;
-                } else if (key.startsWith('tvHired')) {
-                    getRow(idx).S = Number(val) || 0;
-                } else if (key.startsWith('tvTrips')) {
-                    getRow(idx).R = Number(val) || 0;
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    idx = Math.max(0, num - 1);
                 }
             }
-
-            const result = Object.keys(rowsMap)
-                .map(Number)
-                .sort((a, b) => a - b)
-                .map(idx => rowsMap[idx])
-                .filter(row => row.name !== '');
-
-            return result.length > 0 ? result : null;
+            if (idx >= 0 && val && typeof val === 'string' && val.trim() !== '') {
+                getRow(idx).name = val.trim();
+            }
         }
 
-        // -------------------------------------------------------------
-        // ENVÍO DE COMANDOS
-        // -------------------------------------------------------------
-        function sendCommand(cmd) {
-            if (!cmd) return;
-            const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
-            setToast(`📤 Enviando "${cmd}"...`, 'info');
-            fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-cache' })
-                .then(() => setToast(`✅ Comando "${cmd}" enviado`, 'success'))
-                .catch(err => setToast(`❌ Error: ${err.message}`, 'error'));
+        for (const key in normalized) {
+            const match = key.match(/\$(\d+)$/);
+            if (!match) continue;
+            const num = parseInt(match[1], 10);
+            const idx = Math.max(0, num - 2);
+            const val = normalized[key];
+            if (key.startsWith('tvOnStop')) {
+                getRow(idx).P = Number(val) || 0;
+            } else if (key.startsWith('tvOnZone')) {
+                getRow(idx).Z = Number(val) || 0;
+            } else if (key.startsWith('tvHired')) {
+                getRow(idx).S = Number(val) || 0;
+            } else if (key.startsWith('tvTrips')) {
+                getRow(idx).R = Number(val) || 0;
+            }
         }
 
-        document.querySelectorAll('[data-cmd]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const cmd = this.getAttribute('data-cmd');
-                this.style.transform = 'scale(0.92)';
-                setTimeout(() => this.style.transform = '', 150);
-                sendCommand(cmd);
-            });
+        const result = Object.keys(rowsMap)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(idx => rowsMap[idx])
+            .filter(row => row.name !== '');
+
+        return result.length > 0 ? result : null;
+    }
+
+    // -------------------------------------------------------------
+    // ENVÍO DE COMANDOS
+    // -------------------------------------------------------------
+    function sendCommand(cmd) {
+        if (!cmd) return;
+        const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
+        setToast(`📤 Enviando "${cmd}"...`, 'info');
+        fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-cache' })
+            .then(() => setToast(`✅ Comando "${cmd}" enviado`, 'success'))
+            .catch(err => setToast(`❌ Error: ${err.message}`, 'error'));
+    }
+
+    document.querySelectorAll('[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cmd = this.getAttribute('data-cmd');
+            this.style.transform = 'scale(0.92)';
+            setTimeout(() => this.style.transform = '', 150);
+            sendCommand(cmd);
         });
+    });
 
-        // -------------------------------------------------------------
-        // CONEXIÓN A NTFY
-        // -------------------------------------------------------------
-        function connectToNtfy() {
-            setToast('🔄 Conectando a ntfy.sh...', 'info');
-            setStatus(false, 'Conectando...');
+    // -------------------------------------------------------------
+    // CONEXIÓN A NTFY
+    // -------------------------------------------------------------
+    function connectToNtfy() {
+        setToast('🔄 Conectando a ntfy.sh...', 'info');
+        setStatus(false, 'Conectando...');
 
-            try {
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
-                }
+        try {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
 
-                eventSource = new EventSource(NTFY_SSE_URL);
+            eventSource = new EventSource(NTFY_SSE_URL);
 
-                eventSource.onopen = function() {
-                    setToast('✅ Conectado, esperando datos...', 'success');
-                    setStatus(true, 'Conectado');
+            eventSource.onopen = function() {
+                setToast('✅ Conectado, esperando datos...', 'success');
+                setStatus(true, 'Conectado');
+                lastMessageTime = Date.now();
+            };
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const raw = event.data;
+                    if (raw === 'ping' || raw === 'keepalive') return;
                     lastMessageTime = Date.now();
-                };
 
-                eventSource.onmessage = function(event) {
+                    let esDespacho = false;
+                    let textoDespacho = '';
+
+                    let parsedJson = null;
                     try {
-                        const raw = event.data;
-                        if (raw === 'ping' || raw === 'keepalive') return;
-                        lastMessageTime = Date.now();
+                        parsedJson = JSON.parse(raw);
+                    } catch (_) {}
 
-                        let esDespacho = false;
-                        let textoDespacho = '';
-
-                        let parsedJson = null;
-                        try {
-                            parsedJson = JSON.parse(raw);
-                        } catch (_) {}
-
-                        if (parsedJson) {
-                            esDespacho = contieneDespacho(parsedJson);
-                            if (esDespacho) {
-                                textoDespacho = extraerTextoDespacho(parsedJson);
-                                if (!textoDespacho) {
-                                    textoDespacho = JSON.stringify(parsedJson, null, 2);
-                                }
-                            }
-                        } else {
-                            if (typeof raw === 'string' && raw.includes('Tiene Despacho')) {
-                                esDespacho = true;
-                                textoDespacho = raw;
-                            }
-                        }
-
+                    if (parsedJson) {
+                        esDespacho = contieneDespacho(parsedJson);
                         if (esDespacho) {
-                            mostrarModal(textoDespacho);
-                            reproducirSonido();
-                            setToast('📨 ¡Nuevo despacho!', 'warning');
-                            return;
+                            textoDespacho = extraerTextoDespacho(parsedJson);
+                            if (!textoDespacho) {
+                                textoDespacho = JSON.stringify(parsedJson, null, 2);
+                            }
                         }
+                    } else {
+                        if (typeof raw === 'string' && raw.includes('Tiene Despacho')) {
+                            esDespacho = true;
+                            textoDespacho = raw;
+                        }
+                    }
 
-                        let payload = null;
-                        if (parsedJson) {
-                            if (parsedJson.message) {
-                                if (typeof parsedJson.message === 'string') {
-                                    const trimmed = parsedJson.message.trim();
-                                    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                                        try {
-                                            payload = JSON.parse(trimmed);
-                                        } catch (_) {
-                                            payload = trimmed;
-                                        }
-                                    } else {
-                                        return;
+                    if (esDespacho) {
+                        mostrarModal(textoDespacho);
+                        setToast('📨 ¡Nuevo despacho!', 'warning');
+                        return;
+                    }
+
+                    let payload = null;
+                    if (parsedJson) {
+                        if (parsedJson.message) {
+                            if (typeof parsedJson.message === 'string') {
+                                const trimmed = parsedJson.message.trim();
+                                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                                    try {
+                                        payload = JSON.parse(trimmed);
+                                    } catch (_) {
+                                        payload = trimmed;
                                     }
                                 } else {
-                                    payload = parsedJson.message;
+                                    return;
                                 }
                             } else {
-                                payload = parsedJson;
+                                payload = parsedJson.message;
                             }
                         } else {
-                            payload = raw;
+                            payload = parsedJson;
                         }
-
-                        if (!payload) return;
-
-                        const parsedData = parseMacroDroidInput(payload);
-                        if (parsedData && parsedData.length > 0) {
-                            renderTable(parsedData);
-                            updateTimestamp();
-                            setStatus(true, 'Conectado');
-                            setToast(`✅ ${parsedData.length} filas cargadas`, 'success');
-                        } else {
-                            if (typeof payload === 'object') {
-                                setToast('⚠️ Datos no reconocidos', 'warning');
-                            }
-                        }
-                    } catch (e) {}
-                };
-
-                eventSource.onerror = function() {
-                    setStatus(false, 'NO CONECTADO');
-                    setToast('⚠️ Error en conexión ntfy', 'error');
-                    setTimeout(() => {
-                        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-                            connectToNtfy();
-                        }
-                    }, 10000);
-                };
-
-                setInterval(() => {
-                    if (connected && Date.now() - lastMessageTime > 15000) {
-                        setStatus(false, 'NO CONECTADO');
-                        setToast('⏳ Sin datos desde hace 15s', 'warning');
+                    } else {
+                        payload = raw;
                     }
-                }, 5000);
 
-            } catch (e) {
-                setToast('❌ Error al conectar: ' + e.message, 'error');
+                    if (!payload) return;
+
+                    const parsedData = parseMacroDroidInput(payload);
+                    if (parsedData && parsedData.length > 0) {
+                        renderTable(parsedData);
+                        updateTimestamp();
+                        setStatus(true, 'Conectado');
+                        setToast(`✅ ${parsedData.length} filas cargadas`, 'success');
+                    } else {
+                        if (typeof payload === 'object') {
+                            setToast('⚠️ Datos no reconocidos', 'warning');
+                        }
+                    }
+                } catch (e) {}
+            };
+
+            eventSource.onerror = function() {
                 setStatus(false, 'NO CONECTADO');
-            }
-        }
+                setToast('⚠️ Error en conexión ntfy', 'error');
+                setTimeout(() => {
+                    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+                        connectToNtfy();
+                    }
+                }, 10000);
+            };
 
-        // -------------------------------------------------------------
-        // PRUEBA MANUAL
-        // -------------------------------------------------------------
-        let titleClicks = 0;
-        zoneTitleEl.addEventListener('click', function() {
-            titleClicks++;
-            if (titleClicks >= 3) {
-                titleClicks = 0;
-                const testMsg = `10:20 ENSANCHE VALL
-Avenida del Ensanche de Vallecas, 102
-Madrid-Madrid
-Tiene Despacho`;
-                mostrarModal(testMsg);
-                reproducirSonido();
-                setToast('🔔 Prueba de despacho', 'warning');
-            }
+            setInterval(() => {
+                if (connected && Date.now() - lastMessageTime > 15000) {
+                    setStatus(false, 'NO CONECTADO');
+                    setToast('⏳ Sin datos desde hace 15s', 'warning');
+                }
+            }, 5000);
+
+        } catch (e) {
+            setToast('❌ Error al conectar: ' + e.message, 'error');
+            setStatus(false, 'NO CONECTADO');
+        }
+    }
+
+    // -------------------------------------------------------------
+    // PRUEBA MANUAL (Triple clic en el título de la zona)
+    // -------------------------------------------------------------
+    let titleClicks = 0;
+    zoneTitleEl.addEventListener('click', function() {
+        titleClicks++;
+        if (titleClicks >= 3) {
+            titleClicks = 0;
+            const testMsg = `10:20 ENSANCHE VALL\n\nAvenida del Ensanche de Vallecas, 102\nMadrid-Madrid\nTiene Despacho`;
+            mostrarModal(testMsg);
+            setToast('🔔 Prueba de despacho', 'warning');
+        }
+    });
+
+    // -------------------------------------------------------------
+    // INICIO
+    // -------------------------------------------------------------
+    renderTable([]);
+    updateTimestamp();
+    connectToNtfy();
+    setInterval(updateTimestamp, 2000);
+
+    // -------------------------------------------------------------
+    // PWA & NOTIFICACIONES PUSH
+    // -------------------------------------------------------------
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => {
+                    console.log('SW registrado correctamente:', reg.scope);
+                    solicitarPermisoNotificaciones();
+                })
+                .catch(err => console.warn('Error al registrar SW:', err));
         });
+    }
 
-        // -------------------------------------------------------------
-        // INICIO
-        // -------------------------------------------------------------
-        renderTable([]);
-        updateTimestamp();
-        connectToNtfy();
-        setInterval(updateTimestamp, 2000);
+    // -------------------------------------------------------------
+    // WAKE LOCK: evita apagar la pantalla en primer plano
+    // -------------------------------------------------------------
+    let wakeLock = null;
 
-        document.addEventListener('click', initAudio, { once: true });
-        document.addEventListener('touchstart', initAudio, { once: true });
+    async function solicitarWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {}
+    }
 
-        // -------------------------------------------------------------
-        // PWA: registro del service worker
-        // -------------------------------------------------------------
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
-                    .then(reg => console.log('SW registrado, scope:', reg.scope))
-                    .catch(err => console.warn('Fallo registro SW:', err));
-            });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            solicitarWakeLock();
         }
+    });
 
-        // -------------------------------------------------------------
-        // WAKE LOCK: evita que la pantalla se apague mientras la app está abierta
-        // -------------------------------------------------------------
-        let wakeLock = null;
-
-        async function solicitarWakeLock() {
-            if (!('wakeLock' in navigator)) {
-                console.warn('Wake Lock API no soportada en este navegador');
-                return;
-            }
-            try {
-                wakeLock = await navigator.wakeLock.request('screen');
-                wakeLock.addEventListener('release', () => {
-                    console.log('Wake Lock liberado');
-                });
-                console.log('Wake Lock activo: la pantalla no se apagará');
-            } catch (err) {
-                // Suele fallar si la pestaña no está visible o el dispositivo lo deniega
-                console.warn('No se pudo activar Wake Lock:', err.name, err.message);
-            }
-        }
-
-        function liberarWakeLock() {
-            if (wakeLock) {
-                wakeLock.release().catch(() => {});
-                wakeLock = null;
-            }
-        }
-
-        // El navegador libera automáticamente el wake lock al minimizar/bloquear;
-        // hay que volver a pedirlo cuando la app vuelve a estar visible.
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                solicitarWakeLock();
-            }
-        });
-
-        // Solicitud inicial al cargar la app
-        solicitarWakeLock();
-    </script>
+    solicitarWakeLock();
+</script>
 </body>
 </html>
