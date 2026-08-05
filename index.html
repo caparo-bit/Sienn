@@ -651,6 +651,7 @@
                     <button id="btnTestRuta">🕒 Ruta T4</button>
                     <button id="btnTestMonitor">📊 Monitor</button>
                     <button id="btnTestDespachoReal">📍 Despacho prueba</button>
+                    <button id="btnTestServicioReal">🚕 Servicio prueba</button>
                 </div>
             </div>
         </div>
@@ -1281,7 +1282,7 @@
     }
 
     // =============================================================
-    // DETECCIÓN DE DESPACHO (general)
+    // FUNCIONES DE DETECCIÓN DE DESPACHO
     // =============================================================
     function contieneDespacho(valor) {
         if (typeof valor === 'string') {
@@ -1328,47 +1329,137 @@
     }
 
     // =============================================================
-    // parsearDespachoTexto (extrae dirección, ciudad y hora de texto con formato [0]: ...)
+    // DETECTAR DESPACHO CON FORMATO DE ÍNDICES [0]: [1]: etc.
     // =============================================================
-    function parsearDespachoTexto(texto) {
+    function detectarDespachoConIndices(texto) {
         if (typeof texto !== 'string') return null;
+        
+        console.log('[DETECTAR] Analizando texto para índices:', texto);
+        
         const lineas = texto.split('\n');
+        let tieneIndices = false;
         let hora = '--:--';
         let ciudad = '';
         let direccion = '';
-        let zona = '';
         let tieneDespacho = false;
-
-        for (let linea of lineas) {
-            linea = linea.trim();
-            const match = linea.match(/^\[(\d+)\]:\s*(.*)$/);
+        
+        for (const linea of lineas) {
+            const trimmed = linea.trim();
+            const match = trimmed.match(/^\[(\d+)\]:\s*(.*)$/);
             if (match) {
                 const idx = parseInt(match[1], 10);
                 const valor = match[2].trim();
+                tieneIndices = true;
+                console.log('[DETECTAR] Índice', idx, '=', valor);
+                
                 switch (idx) {
-                    case 0: hora = valor || '--:--'; break;
-                    case 1: ciudad = valor; break;
-                    case 2: direccion = valor; break;
-                    case 4: if (valor.includes('Tiene Despacho')) tieneDespacho = true; break;
-                    default: break;
+                    case 0:
+                        hora = valor || '--:--';
+                        break;
+                    case 1:
+                        ciudad = valor;
+                        break;
+                    case 2:
+                        direccion = valor;
+                        break;
+                    case 4:
+                        if (valor.includes('Tiene Despacho')) tieneDespacho = true;
+                        break;
                 }
-            } else {
-                if (linea.includes('Tiene Despacho')) tieneDespacho = true;
             }
         }
-
-        if (!tieneDespacho) return null;
+        
+        if (!tieneIndices) {
+            console.log('[DETECTAR] No es formato con índices');
+            return null;
+        }
+        
         if (!direccion && ciudad) {
             direccion = ciudad;
             ciudad = '';
         }
+        
+        if (!tieneDespacho && (hora !== '--:--' || direccion)) {
+            tieneDespacho = true;
+        }
+        
+        console.log('[DETECTAR] Resultado - Hora:', hora, 'Dirección:', direccion, 'Ciudad:', ciudad, 'TieneDespacho:', tieneDespacho);
+        
+        if (!tieneDespacho) return null;
+        if (!direccion || direccion === '') return null;
+        
         return {
             hora: hora,
-            direccion: direccion || 'Dirección no especificada',
+            direccion: direccion,
             ciudad: ciudad || '',
-            zona: zona || 'Zona no especificada',
+            zona: 'Zona no especificada',
             pregunta: 'Tiene Despacho'
         };
+    }
+
+    // =============================================================
+    // DETECTAR SERVICIO CON FORMATO DE ÍNDICES
+    // =============================================================
+    function detectarServicioConIndices(texto) {
+        if (typeof texto !== 'string') return null;
+        
+        const lineas = texto.split('\n');
+        const campos = {};
+        let tieneIndices = false;
+
+        for (const linea of lineas) {
+            const match = linea.trim().match(/^\[(\d+)\]:\s*(.*)$/);
+            if (match) {
+                tieneIndices = true;
+                campos[parseInt(match[1], 10)] = match[2].trim();
+            }
+        }
+        if (!tieneIndices) {
+            return null;
+        }
+
+        const indices = Object.keys(campos).map(Number).sort((a, b) => a - b);
+
+        // Palabras que marcan el inicio de la sección de botones (fin de los datos)
+        const LABELS = /OBSERVACIONES|AVISOS|NAVEGADOR|DEVOLVER|CLIENTE|IMPRIMIR|CONTADO/i;
+
+        const esServicioDespachado = indices.some(i => LABELS.test(campos[i]));
+        if (!esServicioDespachado) return null;
+
+        // Encontrar el índice donde empieza la sección de botones
+        let labelStartIdx = indices.find(i => LABELS.test(campos[i]));
+
+        // Encontrar el campo que contiene el nombre/teléfono (ej: "ANA -163472891")
+        let phoneIdx = indices.find(i => /\d{6,}/.test(campos[i]));
+        if (phoneIdx === undefined) phoneIdx = 4; // fallback razonable
+
+        const hora = (campos[0] || '--:--').replace('.', '').trim();
+        const ciudad = campos[2] || '';
+        const zona = campos[3] || '';
+        const conductorInfo = campos[phoneIdx] || '';
+
+        // La dirección es TODO lo que hay entre el campo del teléfono y el primer label
+        const direccionPartes = [];
+        for (const i of indices) {
+            if (i > phoneIdx && i < labelStartIdx) {
+                if (campos[i]) direccionPartes.push(campos[i]);
+            }
+        }
+        const direccion = direccionPartes.join(' ').replace(/\s+/g, ' ').trim();
+
+        const numMatch = conductorInfo.match(/(\d{5,})/);
+        const numero = numMatch ? numMatch[1] : hora;
+
+        const result = {
+            number: numero,
+            time: hora,
+            zone: [zona, ciudad].filter(Boolean).join(' - '),
+            address: direccion || ciudad,
+            notes: conductorInfo,
+            status: 'DESPACHADO'
+        };
+        console.log('[SERVICIO] Detectado:', result);
+        return result;
     }
 
     // =============================================================
@@ -1488,7 +1579,6 @@
         };
     }
 
-    // parseOferta mejorado: acepta múltiples nombres de campo
     function parseOferta(data) {
         if (!data || typeof data !== 'object') return null;
         const normalized = {};
@@ -1637,9 +1727,9 @@
         console.log('[renderDespachoConRuta] Zona:', zona);
         console.log('[renderDespachoConRuta] Hora:', hora);
 
-        if (!direccionTexto || direccionTexto.trim() === '' || !ciudad || ciudad.trim() === '') {
-            console.error('[renderDespachoConRuta] No hay dirección suficiente para geocodificar el despacho.');
-            mostrarModalSimple(direccionTexto || 'Dirección no disponible', ciudad || '', zona, hora, pregunta);
+        if (!direccionTexto || direccionTexto.trim() === '') {
+            console.error('[renderDespachoConRuta] Dirección vacía.');
+            mostrarModalSimple('Dirección no disponible', ciudad || '', zona, hora, pregunta);
             return;
         }
 
@@ -1657,7 +1747,7 @@
         userLat = userPos.lat;
         userLon = userPos.lon;
 
-        const dirCompleta = direccionTexto + ', ' + ciudad;
+        const dirCompleta = direccionTexto + (ciudad ? ', ' + ciudad : '');
         const coords = await geocodificarDireccion(dirCompleta);
         if (!coords) {
             console.warn('[DESPACHO] No se pudo geocodificar la dirección');
@@ -1709,7 +1799,7 @@
         modalContent.innerHTML = html;
         setViewState(STATE_OFERTA);
         iniciarAlertaDespacho();
-        lanzarNotificacionNativa(direccionTexto + ' - ' + ciudad + ' (a ' + formatearDistancia(distanciaKm) + ')');
+        lanzarNotificacionNativa(direccionTexto + (ciudad ? ' - ' + ciudad : '') + ' (a ' + formatearDistancia(distanciaKm) + ')');
     }
 
     function mostrarModalSimple(direccion, ciudad, zona, hora, pregunta) {
@@ -1729,7 +1819,7 @@
         modalContent.innerHTML = html;
         setViewState(STATE_OFERTA);
         iniciarAlertaDespacho();
-        lanzarNotificacionNativa(direccion + ' - ' + ciudad);
+        lanzarNotificacionNativa(direccion + (ciudad ? ' - ' + ciudad : ''));
     }
 
     function renderDespachoSimple(texto) {
@@ -1746,7 +1836,7 @@
         srvStatusEl.textContent = servicioData.status.toUpperCase();
         srvTimeEl.textContent = servicioData.time;
         srvZoneEl.textContent = servicioData.zone || "---";
-        srvAddressEl.textContent = servicioData.address || servicioData.pickup || "---";
+        srvAddressEl.textContent = servicioData.address || "---";
         srvObsEl.textContent = servicioData.notes || "Sin observaciones";
         setViewState(STATE_SERVICIO);
         setToast('🚕 Servicio en curso', 'info');
@@ -1772,135 +1862,234 @@
     });
 
     // =============================================================
-    // PROCESADOR GENERAL DE MENSAJES
+    // PROCESADOR GENERAL DE MENSAJES (MEJORADO)
     // =============================================================
     async function processIncomingMessage(rawPayload) {
-        console.log("========== DESPACHO RECIBIDO ==========");
+        console.log("========== MENSAJE RECIBIDO ==========");
         console.log("RAW:", rawPayload);
         console.log("TIPO:", typeof rawPayload);
+        
+        let rawStr = typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload, null, 2);
+        console.log("Raw string:", rawStr);
 
         try {
             let jsonPayload = null;
+            let textPayload = null;
 
-            if (typeof rawPayload === 'string') {
-                const trimmed = rawPayload.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-                    try {
-                        jsonPayload = JSON.parse(trimmed);
-                    } catch (_) {
-                        jsonPayload = trimmed;
-                    }
-                } else {
-                    jsonPayload = trimmed;
-                }
-            } else {
-                jsonPayload = rawPayload;
+            // ---- FUNCIÓN AUXILIAR PARA CONVERTIR CUALQUIER ARRAY A TEXTO CON ÍNDICES ----
+            function arrayToIndexText(arr) {
+                if (!Array.isArray(arr)) return null;
+                return arr.map((v, i) => `[${i}]: ${v}`).join('\n');
             }
 
-            // Desenvolver mensaje de ntfy
-            if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
-                if (typeof jsonPayload.message === 'string') {
-                    const trimmedMsg = jsonPayload.message.trim();
-                    if (trimmedMsg.startsWith('{') || trimmedMsg.startsWith('[')) {
+            // ---- CASO 1: Si es un array directamente ----
+            if (Array.isArray(rawPayload)) {
+                textPayload = arrayToIndexText(rawPayload);
+                console.log('[PROCESS] Payload es array, convertido a índices');
+            }
+            // ---- CASO 2: Si es un objeto ----
+            else if (rawPayload && typeof rawPayload === 'object') {
+                // 2a: Si tiene claves numéricas sin corchetes (ej: {0:"...", 1:"..."})
+                const numericKeys = Object.keys(rawPayload).filter(k => /^\d+$/.test(k));
+                if (numericKeys.length > 0) {
+                    const sorted = numericKeys.map(Number).sort((a,b) => a-b);
+                    const arr = sorted.map(k => rawPayload[k]);
+                    textPayload = arrayToIndexText(arr);
+                    console.log('[PROCESS] Objeto con claves numéricas convertido a índices');
+                }
+                // 2b: Si tiene claves con corchetes [0], [1], etc.
+                else {
+                    const bracketKeys = Object.keys(rawPayload).filter(k => /^\[\d+\]$/.test(k)).sort();
+                    if (bracketKeys.length > 0) {
+                        const lines = bracketKeys.map(k => `${k}: ${rawPayload[k]}`);
+                        textPayload = lines.join('\n');
+                        console.log('[PROCESS] Objeto con índices en corchetes convertido a texto');
+                    }
+                }
+                
+                // 2c: Si tiene campo 'message' (típico de ntfy)
+                if (rawPayload.message !== undefined) {
+                    const msg = rawPayload.message;
+                    if (Array.isArray(msg)) {
+                        textPayload = arrayToIndexText(msg);
+                        console.log('[PROCESS] message es array, convertido a índices');
+                    } else if (typeof msg === 'string') {
+                        // Intentar parsear como JSON array
                         try {
-                            jsonPayload = JSON.parse(trimmedMsg);
+                            const parsed = JSON.parse(msg);
+                            if (Array.isArray(parsed)) {
+                                textPayload = arrayToIndexText(parsed);
+                                console.log('[PROCESS] message string parseado como array JSON, convertido');
+                            }
                         } catch (_) {
-                            jsonPayload = trimmedMsg;
+                            // No es JSON, se usa como texto plano
+                            textPayload = msg;
                         }
                     } else {
-                        jsonPayload = trimmedMsg;
+                        // Otro tipo, serializar
+                        textPayload = JSON.stringify(msg);
                     }
-                } else {
-                    jsonPayload = jsonPayload.message;
+                }
+
+                // Guardar también como JSON para otros parsers
+                jsonPayload = rawPayload;
+            }
+            // ---- CASO 3: Si es string ----
+            else if (typeof rawPayload === 'string') {
+                textPayload = rawPayload;
+                // Intentar parsear como JSON (objeto o array)
+                try {
+                    const parsed = JSON.parse(rawPayload);
+                    if (Array.isArray(parsed)) {
+                        textPayload = arrayToIndexText(parsed);
+                        console.log('[PROCESS] String JSON array parseado y convertido');
+                    } else if (parsed && typeof parsed === 'object') {
+                        jsonPayload = parsed;
+                        // Si tiene message, procesar recursivamente
+                        if (parsed.message) {
+                            const msg = parsed.message;
+                            if (Array.isArray(msg)) {
+                                textPayload = arrayToIndexText(msg);
+                            } else if (typeof msg === 'string') {
+                                try {
+                                    const inner = JSON.parse(msg);
+                                    if (Array.isArray(inner)) {
+                                        textPayload = arrayToIndexText(inner);
+                                    }
+                                } catch (_) {}
+                            }
+                        }
+                    }
+                } catch (_) {
+                    // No es JSON, se mantiene como texto
                 }
             }
 
-            console.log("JSON FINAL:", jsonPayload);
+            // Si aún no tenemos textPayload pero tenemos jsonPayload, intentar extraer texto de alguna manera
+            if (!textPayload && jsonPayload) {
+                if (typeof jsonPayload === 'object') {
+                    // Si tiene campos típicos de oferta o servicio, no lo forzamos a texto
+                    // porque los parsers lo manejan
+                } else {
+                    textPayload = JSON.stringify(jsonPayload);
+                }
+            }
+
+            console.log("[PROCESS] textPayload final:", textPayload);
+            console.log("[PROCESS] jsonPayload:", jsonPayload);
             console.log("=======================================");
 
-            let esDespacho = false;
-            let textoDespacho = '';
-
-            if (typeof jsonPayload === 'string') {
-                if (jsonPayload.includes('Tiene Despacho')) {
-                    esDespacho = true;
-                    textoDespacho = jsonPayload;
-                }
-            } else if (jsonPayload && typeof jsonPayload === 'object') {
-                esDespacho = contieneDespacho(jsonPayload);
-                if (esDespacho) {
-                    textoDespacho = extraerTextoDespacho(jsonPayload);
-                    if (!textoDespacho) textoDespacho = JSON.stringify(jsonPayload, null, 2);
+            // ---- DETECCIÓN ----
+            // 1. Servicio por índices
+            if (textPayload) {
+                const servicioDetectado = detectarServicioConIndices(textPayload);
+                if (servicioDetectado) {
+                    console.log('[SERVICIO] ¡Servicio detectado por índices!', servicioDetectado);
+                    renderServicio(servicioDetectado);
+                    return;
                 }
             }
 
-            if (esDespacho) {
-                console.log('[DESPACHO] ¡Despacho detectado!');
-                limpiarDatosRuta();
-
-                let ofertaParsed = parseOferta(jsonPayload);
-                console.log("OFERTA PARSEADA (objeto):", ofertaParsed);
-
-                if (!ofertaParsed && typeof jsonPayload === 'string') {
-                    const textoParseado = parsearDespachoTexto(jsonPayload);
-                    console.log("OFERTA PARSEADA (texto):", textoParseado);
-                    if (textoParseado) {
-                        ofertaParsed = textoParseado;
-                    }
-                }
-
-                if (ofertaParsed) {
-                    console.log('[DESPACHO] Oferta estructurada:', ofertaParsed);
+            // 2. Despacho por índices
+            if (textPayload) {
+                const despachoDetectado = detectarDespachoConIndices(textPayload);
+                if (despachoDetectado) {
+                    console.log('[DESPACHO] ¡Despacho detectado por índices!', despachoDetectado);
+                    limpiarDatosRuta();
                     await renderDespachoConRuta(
-                        ofertaParsed.direccion,
-                        ofertaParsed.ciudad,
-                        ofertaParsed.zona,
-                        ofertaParsed.hora,
-                        ofertaParsed.pregunta
+                        despachoDetectado.direccion,
+                        despachoDetectado.ciudad,
+                        despachoDetectado.zona,
+                        despachoDetectado.hora,
+                        despachoDetectado.pregunta
                     );
-                } else {
-                    console.log('[DESPACHO] No se pudo extraer estructura, mostrando sin ruta');
-                    renderDespachoSimple(textoDespacho);
+                    setToast('📨 ¡Nuevo despacho!', 'warning');
+                    return;
                 }
+            }
+
+            // 3. Despacho en JSON
+            if (jsonPayload && typeof jsonPayload === 'object') {
+                if (contieneDespacho(jsonPayload)) {
+                    console.log('[DESPACHO] Despacho detectado en objeto JSON');
+                    limpiarDatosRuta();
+                    let ofertaParsed = parseOferta(jsonPayload);
+                    if (ofertaParsed) {
+                        await renderDespachoConRuta(
+                            ofertaParsed.direccion,
+                            ofertaParsed.ciudad,
+                            ofertaParsed.zona,
+                            ofertaParsed.hora,
+                            ofertaParsed.pregunta
+                        );
+                    } else {
+                        const textoDespacho = extraerTextoDespacho(jsonPayload) || JSON.stringify(jsonPayload, null, 2);
+                        renderDespachoSimple(textoDespacho);
+                    }
+                    setToast('📨 ¡Nuevo despacho!', 'warning');
+                    return;
+                }
+            }
+
+            // 4. Despacho en string plano
+            if (textPayload && textPayload.includes('Tiene Despacho')) {
+                console.log('[DESPACHO] Despacho detectado en string plano');
+                limpiarDatosRuta();
+                renderDespachoSimple(textPayload);
                 setToast('📨 ¡Nuevo despacho!', 'warning');
                 return;
             }
 
-            // Resto de parsers
-            const servicioParsed = parseServicio(jsonPayload);
-            if (servicioParsed) {
-                renderServicio(servicioParsed);
-                return;
-            }
-
-            const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
-            if (detalleServiciosParsed) {
-                renderDetalleServicios(detalleServiciosParsed);
-                updateTimestamp();
-                return;
-            }
-
-            const detalleParadaParsed = parseDetalleParada(jsonPayload);
-            if (detalleParadaParsed) {
-                renderDetalleParada(detalleParadaParsed);
-                updateTimestamp();
-                return;
-            }
-
-            const monitorParsed = parseMonitor(jsonPayload);
-            if (monitorParsed) {
-                renderMonitor(monitorParsed);
-                updateTimestamp();
-                setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
-                return;
-            }
-
+            // 5. Parsers para otros tipos (servicio, detalle, monitor, etc.)
             if (jsonPayload && typeof jsonPayload === 'object') {
-                setToast('⚠️ Datos no reconocidos', 'warning');
+                // Servicio (objeto con tvDespatchNumber)
+                const servicioParsed = parseServicio(jsonPayload);
+                if (servicioParsed) {
+                    renderServicio(servicioParsed);
+                    return;
+                }
+
+                // Detalle de servicios
+                const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
+                if (detalleServiciosParsed) {
+                    renderDetalleServicios(detalleServiciosParsed);
+                    updateTimestamp();
+                    return;
+                }
+
+                // Detalle de parada
+                const detalleParadaParsed = parseDetalleParada(jsonPayload);
+                if (detalleParadaParsed) {
+                    renderDetalleParada(detalleParadaParsed);
+                    updateTimestamp();
+                    return;
+                }
+
+                // Monitor
+                const monitorParsed = parseMonitor(jsonPayload);
+                if (monitorParsed) {
+                    renderMonitor(monitorParsed);
+                    updateTimestamp();
+                    setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
+                    return;
+                }
             }
+
+            // ---- Si no se reconoció nada ----
+            if (textPayload) {
+                setToast('📩 Datos recibidos (no reconocidos)', 'info');
+                console.log('[PROCESS] Mensaje no reconocido (texto):', textPayload);
+            } else if (jsonPayload) {
+                setToast('📩 Datos JSON no reconocidos', 'info');
+                console.log('[PROCESS] Mensaje JSON no reconocido:', jsonPayload);
+            } else {
+                setToast('⚠️ Datos no reconocidos', 'warning');
+                console.log('[PROCESS] Payload vacío o no reconocido');
+            }
+
         } catch (e) {
             console.error('[PROCESS] Error en processIncomingMessage:', e);
-            setToast('❌ Error al procesar mensaje', 'error');
+            setToast('❌ Error al procesar mensaje: ' + e.message, 'error');
         }
     }
 
@@ -1911,6 +2100,7 @@
         if (!cmd) return;
         const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
         setToast(`📤 Enviando "${cmd}"...`, 'info');
+        console.log('[COMANDO] Enviando:', cmd);
         fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-cache' })
             .then(() => setToast(`✅ Comando "${cmd}" enviado`, 'success'))
             .catch(err => setToast(`❌ Error: ${err.message}`, 'error'));
@@ -1931,6 +2121,7 @@
     function connectToNtfy() {
         setToast('🔄 Conectando a ntfy.sh...', 'info');
         setStatus(false, 'Conectando...');
+        console.log('[NTFY] Conectando...');
 
         try {
             if (eventSource) {
@@ -1944,6 +2135,7 @@
                 setToast('✅ Conectado, esperando datos...', 'success');
                 setStatus(true, 'Conectado');
                 lastMessageTime = Date.now();
+                console.log('[NTFY] Conexión SSE establecida');
             };
 
             eventSource.onmessage = function(event) {
@@ -1951,12 +2143,14 @@
                 if (raw === 'ping' || raw === 'keepalive') return;
                 lastMessageTime = Date.now();
                 setStatus(true, 'Conectado');
+                console.log('[NTFY] Mensaje recibido:', raw);
                 processIncomingMessage(raw);
             };
 
             eventSource.onerror = function() {
                 setStatus(false, 'NO CONECTADO');
                 setToast('⚠️ Error en conexión ntfy', 'error');
+                console.error('[NTFY] Error en conexión SSE');
                 setTimeout(() => {
                     if (eventSource && eventSource.readyState === EventSource.CLOSED) {
                         connectToNtfy();
@@ -1968,12 +2162,14 @@
                 if (connected && Date.now() - lastMessageTime > 15000) {
                     setStatus(false, 'NO CONECTADO');
                     setToast('⏳ Sin datos desde hace 15s', 'warning');
+                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
                 }
             }, 5000);
 
         } catch (e) {
             setToast('❌ Error al conectar: ' + e.message, 'error');
             setStatus(false, 'NO CONECTADO');
+            console.error('[NTFY] Error al conectar:', e);
         }
     }
 
@@ -1981,28 +2177,32 @@
     // PRUEBAS MANUALES
     // =============================================================
     document.getElementById('btnTestOferta').addEventListener('click', () => {
-        processIncomingMessage({
+        const testData = {
             txInfoAction: "Tiene Despacho",
             txHour: "10:20",
             txSimpleAdress: "Avenida del Ensanche de Vallecas, 102",
             txCity: "Madrid",
             txPickUpZone: "ENSANCHE VALL"
-        });
+        };
+        console.log('[PRUEBA] Oferta:', testData);
+        processIncomingMessage(testData);
     });
 
     document.getElementById('btnTestServicio').addEventListener('click', () => {
-        processIncomingMessage({
+        const testData = {
             tvDespatchNumber: "84920",
             tvPickupTime: "12:45",
             tvPickup: "Calle de Alcalá, 42",
             tvZona: "CENTRO - RETIRO",
             tvText: "Pasar a recoger en la puerta principal.",
             txInfoStateBottomBar: "DESPACHADO"
-        });
+        };
+        console.log('[PRUEBA] Servicio:', testData);
+        processIncomingMessage(testData);
     });
 
     document.getElementById('btnTestParada').addEventListener('click', () => {
-        processIncomingMessage({
+        const testData = {
             tvHeaderText: "P: TERMINAL 4 - 19",
             tvCarInfo: "5504-17:06",
             "tvCarInfo$2": "1890-17:10",
@@ -2014,11 +2214,13 @@
             "tvCarInfo$8": "3072-17:23",
             "tvCarInfo$9": "6-1266--17:23",
             "tvCarInfo$10": "5733-17:23"
-        });
+        };
+        console.log('[PRUEBA] Parada:', testData);
+        processIncomingMessage(testData);
     });
 
     document.getElementById('btnTestRuta').addEventListener('click', () => {
-        processIncomingMessage({
+        const testData = {
             tvHeaderText: "R: TERMINAL 4 - 18",
             tvPickupTime: "19:10",
             tvZoneName: "G. NOBLEJAS",
@@ -2026,28 +2228,54 @@
             "txButtonText$2": "VER TODOS",
             "txButtonText$3": "CERRAR",
             txInfoStateBottomBar: "LIBRE"
-        });
+        };
+        console.log('[PRUEBA] Ruta:', testData);
+        processIncomingMessage(testData);
     });
 
     document.getElementById('btnTestMonitor').addEventListener('click', () => {
-        processIncomingMessage({
+        const testData = {
             tvHeaderText: "Z: ENSANCHE VALL",
             txInfoStateBottomBar: "LIBRE",
             tvZoneName: "ENSANCHE VALL",
             tvOnStop: "2", tvOnZone: "6", tvHired: "1", tvTrips: "10",
             "tvZoneName$1": "VILLA VALLECAS",
             "tvOnStop$1": "0", "tvOnZone$1": "4", "tvHired$1": "0", "tvTrips$1": "5"
-        });
+        };
+        console.log('[PRUEBA] Monitor:', testData);
+        processIncomingMessage(testData);
     });
 
     document.getElementById('btnTestDespachoReal').addEventListener('click', () => {
         const testMsg = {
-            txInfoAction: "Tiene Despacho",
-            txHour: "13:45",
-            txSimpleAdress: "Puerta del Sol",
-            txCity: "Madrid",
-            txPickUpZone: "CENTRO"
+            "[0]": "23:03",
+            "[1]": "22:58 Rivas Vaciamadrid",
+            "[2]": "calle Lago Bañolas",
+            "[3]": "",
+            "[4]": "Tiene Despacho"
         };
+        console.log('[PRUEBA] Despacho índices:', testMsg);
+        processIncomingMessage(testMsg);
+    });
+
+    document.getElementById('btnTestServicioReal').addEventListener('click', () => {
+        const testMsg = {
+            "[0]": "16:26.",
+            "[1]": "<",
+            "[2]": "VACIAMADRID",
+            "[3]": "METRO Rivas",
+            "[4]": "ANA-163472891 O 16:26",
+            "[5]": "Urbanizaciones (Paseo del Ferrocarril 1, Colonia Covibar-Rivas-Vaciamadrid,",
+            "[6]": "Madrid )",
+            "[7]": "OBSERVACIONES",
+            "[8]": "AVISOS",
+            "[9]": "***CONTADO***",
+            "[10]": "IMPRIMIR",
+            "[11]": "NAVEGADOR",
+            "[12]": "DEVOLVER",
+            "[13]": "CLIENTE"
+        };
+        console.log('[PRUEBA] Servicio índices:', testMsg);
         processIncomingMessage(testMsg);
     });
 
@@ -2056,11 +2284,23 @@
         titleClicks++;
         if (titleClicks >= 3) {
             titleClicks = 0;
-            const testMsg = `[0]: 23:03
-[1]: 22:58 Rivas Vaciamadrid
-[2]: calle Lago Bañolas
-[3]:
-[4]: Tiene Despacho`;
+            const testMsg = {
+                "[0]": "16:26.",
+                "[1]": "<",
+                "[2]": "VACIAMADRID",
+                "[3]": "METRO Rivas",
+                "[4]": "ANA-163472891 O 16:26",
+                "[5]": "Urbanizaciones (Paseo del Ferrocarril 1, Colonia Covibar-Rivas-Vaciamadrid,",
+                "[6]": "Madrid )",
+                "[7]": "OBSERVACIONES",
+                "[8]": "AVISOS",
+                "[9]": "***CONTADO***",
+                "[10]": "IMPRIMIR",
+                "[11]": "NAVEGADOR",
+                "[12]": "DEVOLVER",
+                "[13]": "CLIENTE"
+            };
+            console.log('[PRUEBA] Triple click en título:', testMsg);
             processIncomingMessage(testMsg);
         }
     });
@@ -2091,7 +2331,7 @@
     setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
 
-    console.log('✅ Aplicación iniciada');
+    console.log('✅ Aplicación iniciada correctamente');
     </script>
 </body>
 </html>
