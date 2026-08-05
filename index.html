@@ -498,6 +498,7 @@
         .modal-box .modal-buttons .btn-accept { background: #0f7b3a; color: #e0f2e0; }
         .modal-box .modal-buttons .btn-reject { background: #7b1f1f; color: #fcd0d0; }
         .modal-box .modal-buttons .btn-map { background: #1e3a5a; color: #4fa8ff; flex: 0.7; }
+        .modal-box .modal-buttons .btn-correct { background: #b45309; color: #fff3e0; flex: 0.7; }
 
         #viewMapa {
             height: 80vh;
@@ -560,6 +561,86 @@
             font-weight: 600;
         }
 
+        /* Corrección de dirección en el modal */
+        .direccion-edit-area {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .direccion-edit-area input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 30px;
+            border: 1px solid #1e3a5a;
+            background: #0a1628;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            min-width: 150px;
+        }
+        .direccion-edit-area input::placeholder {
+            color: #5c7ea0;
+        }
+        .direccion-edit-area button {
+            background: #4fa8ff;
+            border: none;
+            border-radius: 30px;
+            padding: 8px 16px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        /* Configuración webhook y ntfy */
+        .config-field {
+            margin-bottom: 12px;
+        }
+        .config-field label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .config-field input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 30px;
+            border: 1px solid #1e3a5a;
+            background: #0a1628;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+        }
+        .config-field input:focus {
+            border-color: #4fa8ff;
+        }
+        .config-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .config-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .config-actions .btn-save {
+            background: #0f7b3a;
+            color: #e0f2e0;
+        }
+        .config-actions .btn-close {
+            background: #1e3a5a;
+            color: #b3d9ff;
+        }
+
         @media (max-width:420px) { 
             .btn-grid .btn { font-size: 0.62rem; padding: 10px 0; } 
             .header .title { font-size: 0.92rem; } 
@@ -581,7 +662,7 @@
         <div class="header">
             <div class="back" id="headerBack">‹</div>
             <div class="title" id="zoneTitle">Z: CARGANDO...</div>
-            <div class="filter" id="headerFilter">⏷</div>
+            <div class="filter" id="headerFilter" title="Ajustes">⚙️</div>
         </div>
         <div class="header-strip"></div>
         <div class="subbar">
@@ -731,29 +812,62 @@
         <!-- TOAST -->
         <div class="toast" id="toast">💡 Esperando datos...</div>
 
-        <!-- MODAL -->
+        <!-- MODAL DE DESPACHO -->
         <div class="modal-overlay" id="modalOverlay">
             <div class="modal-box">
                 <div class="modal-title"><span>📨 DESPACHO</span></div>
                 <div class="modal-content" id="modalContent"></div>
+                <div class="direccion-edit-area" id="direccionEditArea" style="display:none;">
+                    <input type="text" id="inputDireccionCorregida" placeholder="Escribe la dirección corregida..." />
+                    <button id="btnAplicarCorreccion">✅ Aplicar</button>
+                </div>
                 <div class="modal-buttons">
                     <button class="btn-map" id="modalMap">🗺️ Mapa</button>
+                    <button class="btn-correct" id="modalCorregir">📍 Corregir dirección</button>
                     <button class="btn-reject" id="modalReject">❌ CANCELAR</button>
                     <button class="btn-accept" id="modalAccept">✅ ACEPTAR</button>
                 </div>
             </div>
         </div>
+
+        <!-- MODAL DE CONFIGURACIÓN (webhook y ntfy) -->
+        <div class="modal-overlay" id="configOverlay">
+            <div class="modal-box">
+                <div class="modal-title"><span>⚙️ CONFIGURACIÓN</span></div>
+                <div class="modal-content" style="max-height:60vh; overflow-y:auto;">
+                    <div class="config-field">
+                        <label>🔗 URL del Webhook</label>
+                        <input type="text" id="configWebhook" placeholder="https://trigger.macrodroid.com/..." />
+                    </div>
+                    <div class="config-field">
+                        <label>📡 Topic de ntfy</label>
+                        <input type="text" id="configNtfyTopic" placeholder="smarttd-monitor" />
+                    </div>
+                    <div style="font-size:0.7rem; color:#5c7ea0; margin-top:6px;">
+                        💡 Los cambios se aplican al guardar y se reinicia la conexión.
+                    </div>
+                </div>
+                <div class="config-actions">
+                    <button class="btn-close" id="configClose">CERRAR</button>
+                    <button class="btn-save" id="configSave">💾 GUARDAR</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     // =============================================================
-    // CONFIGURACIÓN
+    // CONFIGURACIÓN CARGADA DESDE localStorage
     // =============================================================
-    const WEBHOOK_URL = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
-    const NTFY_TOPIC = 'smarttd-monitor';
-    const NTFY_SSE_URL = `https://ntfy.sh/${NTFY_TOPIC}/sse`;
+    const DEFAULT_WEBHOOK = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
+    const DEFAULT_NTFY_TOPIC = 'smarttd-monitor';
+
+    let WEBHOOK_URL = localStorage.getItem('smarttd_webhook_url') || DEFAULT_WEBHOOK;
+    let NTFY_TOPIC = localStorage.getItem('smarttd_ntfy_topic') || DEFAULT_NTFY_TOPIC;
+    const NTFY_SSE_URL = () => `https://ntfy.sh/${NTFY_TOPIC}/sse`;
 
     // =============================================================
     // REFERENCIAS DOM
@@ -764,6 +878,7 @@
     const viewDetalleServicios = document.getElementById('viewDetalleServicios');
     const viewMapa = document.getElementById('viewMapa');
     const modalOverlay = document.getElementById('modalOverlay');
+    const configOverlay = document.getElementById('configOverlay');
 
     const zoneTitleEl = document.getElementById('zoneTitle');
     const tableBody = document.getElementById('tableBody');
@@ -780,6 +895,17 @@
     const modalAccept = document.getElementById('modalAccept');
     const modalReject = document.getElementById('modalReject');
     const modalMap = document.getElementById('modalMap');
+    const modalCorregir = document.getElementById('modalCorregir');
+    const direccionEditArea = document.getElementById('direccionEditArea');
+    const inputDireccionCorregida = document.getElementById('inputDireccionCorregida');
+    const btnAplicarCorreccion = document.getElementById('btnAplicarCorreccion');
+
+    // Configuración
+    const configWebhook = document.getElementById('configWebhook');
+    const configNtfyTopic = document.getElementById('configNtfyTopic');
+    const configSave = document.getElementById('configSave');
+    const configClose = document.getElementById('configClose');
+    const headerFilter = document.getElementById('headerFilter');
 
     const stopHeaderTitleEl = document.getElementById('stopHeaderTitle');
     const stopCarListEl = document.getElementById('stopCarList');
@@ -810,7 +936,14 @@
     let routeGeometry = null;
     let mapInstance = null;
     let mapInitialized = false;
-    let tileLayer = null; // guardar la capa base
+    let tileLayer = null;
+
+    // Variables para corrección de dirección
+    let currentDireccionOriginal = '';
+    let currentCiudadOriginal = '';
+    let currentZonaOriginal = '';
+    let currentHoraOriginal = '';
+    let currentPreguntaOriginal = '';
 
     // =============================================================
     // MÁQUINA DE ESTADOS
@@ -852,12 +985,10 @@
             console.log('[MAP] Abriendo vista mapa...');
             ocultarModal();
             viewMapa.classList.add('active');
-            // Inicializar el mapa solo si no está inicializado, pero siempre redimensionar
             if (!mapInitialized) {
                 console.log('[MAP] Inicializando por primera vez...');
                 initMap();
             }
-            // Forzar redimensionamiento después de que la vista esté visible
             setTimeout(() => {
                 console.log('[MAP] Redimensionando mapa...');
                 if (mapInstance) {
@@ -890,8 +1021,249 @@
     });
 
     // =============================================================
-    // GEOLOCALIZACIÓN, GEOCODIFICACIÓN Y RUTAS
+    // CONFIGURACIÓN - Mostrar/Guardar
     // =============================================================
+    function abrirConfiguracion() {
+        configWebhook.value = WEBHOOK_URL;
+        configNtfyTopic.value = NTFY_TOPIC;
+        configOverlay.classList.add('active');
+    }
+
+    function cerrarConfiguracion() {
+        configOverlay.classList.remove('active');
+    }
+
+    headerFilter.addEventListener('click', abrirConfiguracion);
+    configClose.addEventListener('click', cerrarConfiguracion);
+
+    configSave.addEventListener('click', () => {
+        const newWebhook = configWebhook.value.trim();
+        const newTopic = configNtfyTopic.value.trim();
+        if (!newWebhook || !newTopic) {
+            setToast('❌ Ambos campos son obligatorios', 'error');
+            return;
+        }
+        // Guardar en localStorage
+        localStorage.setItem('smarttd_webhook_url', newWebhook);
+        localStorage.setItem('smarttd_ntfy_topic', newTopic);
+        // Actualizar variables globales
+        WEBHOOK_URL = newWebhook;
+        NTFY_TOPIC = newTopic;
+        // Reconectar ntfy con el nuevo topic
+        reconectarNtfy();
+        cerrarConfiguracion();
+        setToast('✅ Configuración guardada y reconectando...', 'success');
+        console.log('[CONFIG] Nuevo webhook:', WEBHOOK_URL);
+        console.log('[CONFIG] Nuevo topic:', NTFY_TOPIC);
+    });
+
+    // Si no hay configuración guardada, mostrar el modal al inicio
+    function mostrarConfigSiNoExiste() {
+        const webhookSaved = localStorage.getItem('smarttd_webhook_url');
+        const topicSaved = localStorage.getItem('smarttd_ntfy_topic');
+        if (!webhookSaved || !topicSaved) {
+            abrirConfiguracion();
+        }
+    }
+
+    // =============================================================
+    // ENVÍO DE COMANDOS (usa WEBHOOK_URL)
+    // =============================================================
+    function sendCommand(cmd) {
+        if (!cmd) return;
+        const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
+        setToast(`📤 Enviando "${cmd}"...`, 'info');
+        console.log('[COMANDO] Enviando:', cmd, 'a', url);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(response => {
+            clearTimeout(timeoutId);
+            if (response.ok) {
+                setToast(`✅ Comando "${cmd}" enviado (${response.status})`, 'success');
+            } else {
+                setToast(`⚠️ Comando enviado pero respuesta ${response.status}`, 'warning');
+            }
+        })
+        .catch(err => {
+            clearTimeout(timeoutId);
+            if (err.name === 'AbortError') {
+                setToast('❌ Timeout: el webhook no responde', 'error');
+            } else {
+                setToast(`❌ Error: ${err.message}`, 'error');
+            }
+            console.error('[COMANDO] Error:', err);
+        });
+    }
+
+    document.querySelectorAll('[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cmd = this.getAttribute('data-cmd');
+            this.style.transform = 'scale(0.92)';
+            setTimeout(() => this.style.transform = '', 150);
+            sendCommand(cmd);
+        });
+    });
+
+    // =============================================================
+    // CONEXIÓN NTFY (usa NTFY_SSE_URL)
+    // =============================================================
+    function connectToNtfy() {
+        setToast('🔄 Conectando a ntfy.sh...', 'info');
+        setStatus(false, 'Conectando...');
+        console.log('[NTFY] Conectando a topic:', NTFY_TOPIC);
+
+        try {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            const url = NTFY_SSE_URL();
+            console.log('[NTFY] SSE URL:', url);
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = function() {
+                setToast('✅ Conectado, esperando datos...', 'success');
+                setStatus(true, 'Conectado');
+                lastMessageTime = Date.now();
+                console.log('[NTFY] Conexión SSE establecida');
+            };
+
+            eventSource.onmessage = function(event) {
+                const raw = event.data;
+                if (raw === 'ping' || raw === 'keepalive') return;
+                lastMessageTime = Date.now();
+                setStatus(true, 'Conectado');
+                console.log('[NTFY] Mensaje recibido:', raw);
+                processIncomingMessage(raw);
+            };
+
+            eventSource.onerror = function() {
+                setStatus(false, 'NO CONECTADO');
+                setToast('⚠️ Error en conexión ntfy', 'error');
+                console.error('[NTFY] Error en conexión SSE');
+                setTimeout(() => {
+                    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+                        connectToNtfy();
+                    }
+                }, 10000);
+            };
+
+            setInterval(() => {
+                if (connected && Date.now() - lastMessageTime > 15000) {
+                    setStatus(false, 'NO CONECTADO');
+                    setToast('⏳ Sin datos desde hace 15s', 'warning');
+                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
+                }
+            }, 5000);
+
+        } catch (e) {
+            setToast('❌ Error al conectar: ' + e.message, 'error');
+            setStatus(false, 'NO CONECTADO');
+            console.error('[NTFY] Error al conectar:', e);
+        }
+    }
+
+    function reconectarNtfy() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        connectToNtfy();
+    }
+
+    // =============================================================
+    // GEOLOCALIZACIÓN Y GEOCODIFICACIÓN MEJORADA
+    // =============================================================
+    function limpiarYExtraerDireccion(texto) {
+        if (!texto) return null;
+        let limpio = texto.replace(/\s+/g, ' ').trim();
+        const partes = limpio.split(',').map(p => p.trim());
+        let calle = partes[0] || '';
+        let ciudad = partes.length > 1 ? partes[partes.length-1] : '';
+        let numero = '';
+        const matchNum = calle.match(/(.*?)(\d+)\s*$/);
+        if (matchNum) {
+            calle = matchNum[1].trim();
+            numero = matchNum[2];
+        }
+        if (!calle && limpio) calle = limpio;
+        return { calle, numero, ciudad };
+    }
+
+    async function geocodificarDireccionInteligente(direccionCompleta, ciudad = '') {
+        if (!direccionCompleta || direccionCompleta.trim() === '') {
+            console.warn('[GEO] Dirección vacía');
+            return null;
+        }
+        setToast('🔍 Buscando ubicación...', 'info');
+        console.log('[GEO] Geocodificando:', direccionCompleta);
+
+        const query = encodeURIComponent(direccionCompleta + (ciudad ? ', ' + ciudad : '') + ', España');
+        const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=es`;
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
+            });
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                console.log('[GEO] Coordenadas obtenidas:', coords);
+                setToast('✅ Ubicación encontrada', 'success');
+                return coords;
+            }
+        } catch (e) {
+            console.error('[GEO] Error en geocodificación:', e);
+        }
+
+        // Fallback: solo calle y número
+        const extraida = limpiarYExtraerDireccion(direccionCompleta);
+        if (extraida && extraida.calle) {
+            const query2 = encodeURIComponent(extraida.calle + (extraida.numero ? ' ' + extraida.numero : '') + ', España');
+            try {
+                const response2 = await fetch(`https://nominatim.openstreetmap.org/search?q=${query2}&format=json&limit=1&countrycodes=es`, {
+                    headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
+                });
+                const data2 = await response2.json();
+                if (data2 && data2.length > 0) {
+                    const coords = { lat: parseFloat(data2[0].lat), lon: parseFloat(data2[0].lon) };
+                    console.log('[GEO] Coordenadas obtenidas (fallback):', coords);
+                    setToast('✅ Ubicación encontrada (fallback)', 'success');
+                    return coords;
+                }
+            } catch (e) {}
+        }
+
+        if (ciudad) {
+            const query3 = encodeURIComponent(ciudad + ', España');
+            try {
+                const response3 = await fetch(`https://nominatim.openstreetmap.org/search?q=${query3}&format=json&limit=1&countrycodes=es`, {
+                    headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
+                });
+                const data3 = await response3.json();
+                if (data3 && data3.length > 0) {
+                    const coords = { lat: parseFloat(data3[0].lat), lon: parseFloat(data3[0].lon) };
+                    console.log('[GEO] Coordenadas de ciudad (aproximadas):', coords);
+                    setToast('📍 Ubicación aproximada (ciudad)', 'warning');
+                    return coords;
+                }
+            } catch (e) {}
+        }
+
+        setToast('❌ No se pudo geolocalizar la dirección', 'error');
+        return null;
+    }
+
     function obtenerPosicionUsuario() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
@@ -916,34 +1288,6 @@
         });
     }
 
-    async function geocodificarDireccion(direccion) {
-        if (!direccion || direccion.trim() === '') {
-            console.warn('[GEO] Dirección vacía');
-            return null;
-        }
-        try {
-            console.log('[GEO] Geocodificando:', direccion);
-            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(direccion)}&format=json&limit=1`;
-            const response = await fetch(url, {
-                headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
-            });
-            const data = await response.json();
-            if (data && data.length > 0) {
-                const coords = {
-                    lat: parseFloat(data[0].lat),
-                    lon: parseFloat(data[0].lon)
-                };
-                console.log('[GEO] Coordenadas obtenidas:', coords);
-                return coords;
-            }
-            console.warn('[GEO] No se encontraron resultados');
-            return null;
-        } catch (e) {
-            console.error('[GEO] Error:', e);
-            return null;
-        }
-    }
-
     async function obtenerRutaOSRM(originLat, originLon, destLat, destLon) {
         try {
             console.log('[OSRM] Calculando ruta de', originLat, originLon, 'a', destLat, destLon);
@@ -956,11 +1300,7 @@
                 const tiempo = route.duration / 60;
                 const coords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
                 console.log('[OSRM] Ruta obtenida:', distancia.toFixed(2), 'km,', tiempo.toFixed(0), 'min');
-                return {
-                    distancia_km: distancia,
-                    tiempo_min: tiempo,
-                    geometry: coords
-                };
+                return { distancia_km: distancia, tiempo_min: tiempo, geometry: coords };
             }
             console.warn('[OSRM] No se encontró ruta');
             return null;
@@ -995,7 +1335,7 @@
     }
 
     // =============================================================
-    // MAPA (CORREGIDO)
+    // MAPA
     // =============================================================
     function initMap() {
         if (mapInitialized) {
@@ -1019,7 +1359,6 @@
                 attributionControl: true
             }).setView([40.4168, -3.7038], 13);
 
-            // Guardar la capa base para no eliminarla al limpiar
             tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapInstance);
@@ -1048,14 +1387,12 @@
         console.log('[MAP] Despacho coords:', despachoLat, despachoLon);
         console.log('[MAP] Usuario coords:', userLat, userLon);
 
-        // Limpiar capas anteriores excepto la capa base (tileLayer)
         mapInstance.eachLayer((layer) => {
             if (layer !== tileLayer) {
                 mapInstance.removeLayer(layer);
             }
         });
 
-        // Si no hay destino, mostrar mensaje
         if (!despachoLat || !despachoLon) {
             console.warn('[MAP] No hay coordenadas de despacho, mostrando mensaje');
             const msg = L.divIcon({
@@ -1070,12 +1407,10 @@
             return;
         }
 
-        // Marcador de destino
         L.marker([despachoLat, despachoLon], {
             icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
         }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
 
-        // Marcador de usuario (si existe)
         if (userLat && userLon) {
             L.marker([userLat, userLon], {
                 icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
@@ -1084,7 +1419,6 @@
             console.warn('[MAP] Sin ubicación de usuario');
         }
 
-        // Dibujar ruta
         if (routeGeometry && routeGeometry.length > 1 && userLat && userLon) {
             console.log('[MAP] Dibujando ruta con', routeGeometry.length, 'puntos');
             L.polyline(routeGeometry, { color: '#4fa8ff', weight: 5, opacity: 0.8 })
@@ -1100,7 +1434,6 @@
             }).addTo(mapInstance).bindPopup('⚠️ Distancia en línea recta (sin ruta)');
         }
 
-        // Ajustar vista para abarcar todos los puntos
         const bounds = L.latLngBounds([ [despachoLat, despachoLon] ]);
         if (userLat && userLon) {
             bounds.extend([userLat, userLon]);
@@ -1288,15 +1621,11 @@
     }
 
     // =============================================================
-    // FUNCIONES DE DETECCIÓN DE DESPACHO
+    // DETECCIÓN DE DESPACHO Y SERVICIO
     // =============================================================
     function contieneDespacho(valor) {
-        if (typeof valor === 'string') {
-            return valor.includes('Tiene Despacho');
-        }
-        if (Array.isArray(valor)) {
-            return valor.some(item => contieneDespacho(item));
-        }
+        if (typeof valor === 'string') return valor.includes('Tiene Despacho');
+        if (Array.isArray(valor)) return valor.some(item => contieneDespacho(item));
         if (valor && typeof valor === 'object') {
             for (const key in valor) {
                 if (contieneDespacho(valor[key])) return true;
@@ -1307,16 +1636,12 @@
 
     function extraerTextoDespacho(valor, acumulado = '') {
         if (typeof valor === 'string') {
-            if (valor.includes('Tiene Despacho')) {
-                return acumulado + (acumulado ? '\n' : '') + valor;
-            }
+            if (valor.includes('Tiene Despacho')) return acumulado + (acumulado ? '\n' : '') + valor;
             return acumulado;
         }
         if (Array.isArray(valor)) {
             let result = acumulado;
-            for (const item of valor) {
-                result = extraerTextoDespacho(item, result);
-            }
+            for (const item of valor) result = extraerTextoDespacho(item, result);
             return result;
         }
         if (valor && typeof valor === 'object') {
@@ -1334,21 +1659,10 @@
         return acumulado;
     }
 
-    // =============================================================
-    // DETECTAR DESPACHO CON FORMATO DE ÍNDICES [0]: [1]: etc.
-    // =============================================================
     function detectarDespachoConIndices(texto) {
         if (typeof texto !== 'string') return null;
-        
-        console.log('[DETECTAR] Analizando texto para índices:', texto);
-        
         const lineas = texto.split('\n');
-        let tieneIndices = false;
-        let hora = '--:--';
-        let ciudad = '';
-        let direccion = '';
-        let tieneDespacho = false;
-        
+        let tieneIndices = false, hora = '--:--', ciudad = '', direccion = '', tieneDespacho = false;
         for (const linea of lineas) {
             const trimmed = linea.trim();
             const match = trimmed.match(/^\[(\d+)\]:\s*(.*)$/);
@@ -1356,63 +1670,27 @@
                 const idx = parseInt(match[1], 10);
                 const valor = match[2].trim();
                 tieneIndices = true;
-                console.log('[DETECTAR] Índice', idx, '=', valor);
-                
                 switch (idx) {
-                    case 0:
-                        hora = valor || '--:--';
-                        break;
-                    case 1:
-                        ciudad = valor;
-                        break;
-                    case 2:
-                        direccion = valor;
-                        break;
-                    case 4:
-                        if (valor.includes('Tiene Despacho')) tieneDespacho = true;
-                        break;
+                    case 0: hora = valor || '--:--'; break;
+                    case 1: ciudad = valor; break;
+                    case 2: direccion = valor; break;
+                    case 4: if (valor.includes('Tiene Despacho')) tieneDespacho = true; break;
                 }
             }
         }
-        
-        if (!tieneIndices) {
-            console.log('[DETECTAR] No es formato con índices');
-            return null;
-        }
-        
-        if (!direccion && ciudad) {
-            direccion = ciudad;
-            ciudad = '';
-        }
-        
-        if (!tieneDespacho && (hora !== '--:--' || direccion)) {
-            tieneDespacho = true;
-        }
-        
-        console.log('[DETECTAR] Resultado - Hora:', hora, 'Dirección:', direccion, 'Ciudad:', ciudad, 'TieneDespacho:', tieneDespacho);
-        
+        if (!tieneIndices) return null;
+        if (!direccion && ciudad) { direccion = ciudad; ciudad = ''; }
+        if (!tieneDespacho && (hora !== '--:--' || direccion)) tieneDespacho = true;
         if (!tieneDespacho) return null;
         if (!direccion || direccion === '') return null;
-        
-        return {
-            hora: hora,
-            direccion: direccion,
-            ciudad: ciudad || '',
-            zona: 'Zona no especificada',
-            pregunta: 'Tiene Despacho'
-        };
+        return { hora, direccion, ciudad: ciudad || '', zona: 'Zona no especificada', pregunta: 'Tiene Despacho' };
     }
 
-    // =============================================================
-    // DETECTAR SERVICIO CON FORMATO DE ÍNDICES
-    // =============================================================
     function detectarServicioConIndices(texto) {
         if (typeof texto !== 'string') return null;
-        
         const lineas = texto.split('\n');
         const campos = {};
         let tieneIndices = false;
-
         for (const linea of lineas) {
             const match = linea.trim().match(/^\[(\d+)\]:\s*(.*)$/);
             if (match) {
@@ -1420,31 +1698,18 @@
                 campos[parseInt(match[1], 10)] = match[2].trim();
             }
         }
-        if (!tieneIndices) {
-            return null;
-        }
-
+        if (!tieneIndices) return null;
         const indices = Object.keys(campos).map(Number).sort((a, b) => a - b);
-
-        // Palabras que marcan el inicio de la sección de botones (fin de los datos)
         const LABELS = /OBSERVACIONES|AVISOS|NAVEGADOR|DEVOLVER|CLIENTE|IMPRIMIR|CONTADO/i;
-
         const esServicioDespachado = indices.some(i => LABELS.test(campos[i]));
         if (!esServicioDespachado) return null;
-
-        // Encontrar el índice donde empieza la sección de botones
         let labelStartIdx = indices.find(i => LABELS.test(campos[i]));
-
-        // Encontrar el campo que contiene el nombre/teléfono (ej: "ANA -163472891")
         let phoneIdx = indices.find(i => /\d{6,}/.test(campos[i]));
-        if (phoneIdx === undefined) phoneIdx = 4; // fallback razonable
-
+        if (phoneIdx === undefined) phoneIdx = 4;
         const hora = (campos[0] || '--:--').replace('.', '').trim();
         const ciudad = campos[2] || '';
         const zona = campos[3] || '';
         const conductorInfo = campos[phoneIdx] || '';
-
-        // La dirección es TODO lo que hay entre el campo del teléfono y el primer label
         const direccionPartes = [];
         for (const i of indices) {
             if (i > phoneIdx && i < labelStartIdx) {
@@ -1452,11 +1717,9 @@
             }
         }
         const direccion = direccionPartes.join(' ').replace(/\s+/g, ' ').trim();
-
         const numMatch = conductorInfo.match(/(\d{5,})/);
         const numero = numMatch ? numMatch[1] : hora;
-
-        const result = {
+        return {
             number: numero,
             time: hora,
             zone: [zona, ciudad].filter(Boolean).join(' - '),
@@ -1464,8 +1727,6 @@
             notes: conductorInfo,
             status: 'DESPACHADO'
         };
-        console.log('[SERVICIO] Detectado:', result);
-        return result;
     }
 
     // =============================================================
@@ -1592,46 +1853,13 @@
             let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-        
-        if (!normalized.txInfoAction || !normalized.txInfoAction.includes("Tiene Despacho")) {
-            return null;
-        }
-
-        const direccion = normalized.txSimpleAdress 
-                       || normalized.tvPickup 
-                       || normalized.tvAddress 
-                       || normalized.tvDireccion 
-                       || normalized.direccion 
-                       || normalized.address 
-                       || "";
-
-        const ciudad = normalized.txCity 
-                    || normalized.tvCity 
-                    || normalized.ciudad 
-                    || "";
-
-        const zona = normalized.txPickUpZone 
-                  || normalized.tvZona 
-                  || normalized.zona 
-                  || "";
-
-        const hora = normalized.txHour 
-                  || normalized.tvPickupTime 
-                  || normalized.hora 
-                  || "--:--";
-
-        if (!direccion.trim()) {
-            console.warn('[parseOferta] Dirección vacía, no se puede procesar.');
-            return null;
-        }
-
-        return {
-            hora: hora,
-            direccion: direccion,
-            ciudad: ciudad,
-            zona: zona,
-            pregunta: normalized.txInfoAction
-        };
+        if (!normalized.txInfoAction || !normalized.txInfoAction.includes("Tiene Despacho")) return null;
+        const direccion = normalized.txSimpleAdress || normalized.tvPickup || normalized.tvAddress || normalized.tvDireccion || normalized.direccion || normalized.address || "";
+        const ciudad = normalized.txCity || normalized.tvCity || normalized.ciudad || "";
+        const zona = normalized.txPickUpZone || normalized.tvZona || normalized.zona || "";
+        const hora = normalized.txHour || normalized.tvPickupTime || normalized.hora || "--:--";
+        if (!direccion.trim()) return null;
+        return { hora, direccion, ciudad, zona, pregunta: normalized.txInfoAction };
     }
 
     function parseServicio(data) {
@@ -1733,13 +1961,18 @@
         console.log('[renderDespachoConRuta] Zona:', zona);
         console.log('[renderDespachoConRuta] Hora:', hora);
 
+        currentDireccionOriginal = direccionTexto;
+        currentCiudadOriginal = ciudad || '';
+        currentZonaOriginal = zona || '';
+        currentHoraOriginal = hora || '';
+        currentPreguntaOriginal = pregunta || '';
+
         if (!direccionTexto || direccionTexto.trim() === '') {
             console.error('[renderDespachoConRuta] Dirección vacía.');
             mostrarModalSimple('Dirección no disponible', ciudad || '', zona, hora, pregunta);
             return;
         }
 
-        console.log('[DESPACHO] Renderizando con ruta para:', direccionTexto, ciudad);
         limpiarDatosRuta();
 
         const userPos = await obtenerPosicionUsuario();
@@ -1749,14 +1982,12 @@
             mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
             return;
         }
-
         userLat = userPos.lat;
         userLon = userPos.lon;
 
-        const dirCompleta = direccionTexto + (ciudad ? ', ' + ciudad : '');
-        const coords = await geocodificarDireccion(dirCompleta);
+        const coords = await geocodificarDireccionInteligente(direccionTexto, ciudad);
         if (!coords) {
-            console.warn('[DESPACHO] No se pudo geocodificar la dirección');
+            console.warn('[DESPACHO] No se pudo geolocalizar la dirección');
             setToast('⚠️ No se pudo geolocalizar la dirección', 'warning');
             mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
             return;
@@ -1764,7 +1995,7 @@
 
         despachoLat = coords.lat;
         despachoLon = coords.lon;
-        despachoDireccion = dirCompleta;
+        despachoDireccion = direccionTexto + (ciudad ? ', ' + ciudad : '');
         console.log('[DESPACHO] Coordenadas de destino:', despachoLat, despachoLon);
 
         const ruta = await obtenerRutaOSRM(userLat, userLon, despachoLat, despachoLon);
@@ -1851,6 +2082,7 @@
     function ocultarModal() {
         modalOverlay.classList.remove('active');
         detenerAlertaDespacho();
+        direccionEditArea.style.display = 'none';
     }
 
     modalAccept.addEventListener('click', () => {
@@ -1868,7 +2100,70 @@
     });
 
     // =============================================================
-    // PROCESADOR GENERAL DE MENSAJES (MEJORADO)
+    // CORRECCIÓN DE DIRECCIÓN
+    // =============================================================
+    modalCorregir.addEventListener('click', () => {
+        if (direccionEditArea.style.display === 'none') {
+            direccionEditArea.style.display = 'flex';
+            inputDireccionCorregida.value = currentDireccionOriginal + (currentCiudadOriginal ? ', ' + currentCiudadOriginal : '');
+            inputDireccionCorregida.focus();
+        } else {
+            direccionEditArea.style.display = 'none';
+        }
+    });
+
+    btnAplicarCorreccion.addEventListener('click', async () => {
+        const nuevaDireccion = inputDireccionCorregida.value.trim();
+        if (!nuevaDireccion) {
+            setToast('❌ Escribe una dirección válida', 'error');
+            return;
+        }
+        direccionEditArea.style.display = 'none';
+        setToast('🔍 Re-geocodificando...', 'info');
+        const coords = await geocodificarDireccionInteligente(nuevaDireccion, '');
+        if (!coords) {
+            setToast('❌ No se pudo localizar la dirección', 'error');
+            return;
+        }
+        despachoLat = coords.lat;
+        despachoLon = coords.lon;
+        despachoDireccion = nuevaDireccion;
+        if (userLat && userLon) {
+            const ruta = await obtenerRutaOSRM(userLat, userLon, despachoLat, despachoLon);
+            if (ruta) {
+                despachoDistancia = ruta.distancia_km;
+                despachoTiempo = ruta.tiempo_min;
+                routeGeometry = ruta.geometry;
+            } else {
+                despachoDistancia = calcularDistanciaLineal(userLat, userLon, despachoLat, despachoLon);
+                despachoTiempo = despachoDistancia / 30 * 60;
+                routeGeometry = null;
+                setToast('⚠️ Ruta en línea recta (sin carretera)', 'warning');
+            }
+            setToast('✅ Dirección actualizada', 'success');
+            const html = `
+                <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(currentHoraOriginal)}</div>
+                <div style="margin-bottom:8px; line-height:1.5;">
+                    ${escapeHtml(nuevaDireccion)}<br>
+                    ${escapeHtml(currentCiudadOriginal)}<br>
+                    <b>Zona:</b> ${escapeHtml(currentZonaOriginal)}
+                </div>
+                <div class="despacho-distancia">
+                    <span>🚗 ${formatearDistancia(despachoDistancia)}</span>
+                    <span>⏱️ ${formatearTiempo(despachoTiempo)}</span>
+                </div>
+                <div style="border-top:1px solid #1e3a5a; padding-top:12px; margin-top:8px; font-weight:700; text-align:center; color:#fff;">
+                    ${escapeHtml(currentPreguntaOriginal)}
+                </div>
+            `;
+            modalContent.innerHTML = html;
+        } else {
+            setToast('⚠️ No hay ubicación de usuario, no se puede calcular ruta', 'warning');
+        }
+    });
+
+    // =============================================================
+    // PROCESADOR DE MENSAJES
     // =============================================================
     async function processIncomingMessage(rawPayload) {
         console.log("========== MENSAJE RECIBIDO ==========");
@@ -1882,29 +2177,22 @@
             let jsonPayload = null;
             let textPayload = null;
 
-            // ---- FUNCIÓN AUXILIAR PARA CONVERTIR CUALQUIER ARRAY A TEXTO CON ÍNDICES ----
             function arrayToIndexText(arr) {
                 if (!Array.isArray(arr)) return null;
                 return arr.map((v, i) => `[${i}]: ${v}`).join('\n');
             }
 
-            // ---- CASO 1: Si es un array directamente ----
             if (Array.isArray(rawPayload)) {
                 textPayload = arrayToIndexText(rawPayload);
                 console.log('[PROCESS] Payload es array, convertido a índices');
-            }
-            // ---- CASO 2: Si es un objeto ----
-            else if (rawPayload && typeof rawPayload === 'object') {
-                // 2a: Si tiene claves numéricas sin corchetes (ej: {0:"...", 1:"..."})
+            } else if (rawPayload && typeof rawPayload === 'object') {
                 const numericKeys = Object.keys(rawPayload).filter(k => /^\d+$/.test(k));
                 if (numericKeys.length > 0) {
                     const sorted = numericKeys.map(Number).sort((a,b) => a-b);
                     const arr = sorted.map(k => rawPayload[k]);
                     textPayload = arrayToIndexText(arr);
                     console.log('[PROCESS] Objeto con claves numéricas convertido a índices');
-                }
-                // 2b: Si tiene claves con corchetes [0], [1], etc.
-                else {
+                } else {
                     const bracketKeys = Object.keys(rawPayload).filter(k => /^\[\d+\]$/.test(k)).sort();
                     if (bracketKeys.length > 0) {
                         const lines = bracketKeys.map(k => `${k}: ${rawPayload[k]}`);
@@ -1912,15 +2200,12 @@
                         console.log('[PROCESS] Objeto con índices en corchetes convertido a texto');
                     }
                 }
-                
-                // 2c: Si tiene campo 'message' (típico de ntfy)
                 if (rawPayload.message !== undefined) {
                     const msg = rawPayload.message;
                     if (Array.isArray(msg)) {
                         textPayload = arrayToIndexText(msg);
                         console.log('[PROCESS] message es array, convertido a índices');
                     } else if (typeof msg === 'string') {
-                        // Intentar parsear como JSON array
                         try {
                             const parsed = JSON.parse(msg);
                             if (Array.isArray(parsed)) {
@@ -1928,22 +2213,15 @@
                                 console.log('[PROCESS] message string parseado como array JSON, convertido');
                             }
                         } catch (_) {
-                            // No es JSON, se usa como texto plano
                             textPayload = msg;
                         }
                     } else {
-                        // Otro tipo, serializar
                         textPayload = JSON.stringify(msg);
                     }
                 }
-
-                // Guardar también como JSON para otros parsers
                 jsonPayload = rawPayload;
-            }
-            // ---- CASO 3: Si es string ----
-            else if (typeof rawPayload === 'string') {
+            } else if (typeof rawPayload === 'string') {
                 textPayload = rawPayload;
-                // Intentar parsear como JSON (objeto o array)
                 try {
                     const parsed = JSON.parse(rawPayload);
                     if (Array.isArray(parsed)) {
@@ -1951,7 +2229,6 @@
                         console.log('[PROCESS] String JSON array parseado y convertido');
                     } else if (parsed && typeof parsed === 'object') {
                         jsonPayload = parsed;
-                        // Si tiene message, procesar recursivamente
                         if (parsed.message) {
                             const msg = parsed.message;
                             if (Array.isArray(msg)) {
@@ -1966,16 +2243,12 @@
                             }
                         }
                     }
-                } catch (_) {
-                    // No es JSON, se mantiene como texto
-                }
+                } catch (_) {}
             }
 
-            // Si aún no tenemos textPayload pero tenemos jsonPayload, intentar extraer texto de alguna manera
             if (!textPayload && jsonPayload) {
                 if (typeof jsonPayload === 'object') {
-                    // Si tiene campos típicos de oferta o servicio, no lo forzamos a texto
-                    // porque los parsers lo manejan
+                    // no forzar
                 } else {
                     textPayload = JSON.stringify(jsonPayload);
                 }
@@ -1985,8 +2258,7 @@
             console.log("[PROCESS] jsonPayload:", jsonPayload);
             console.log("=======================================");
 
-            // ---- DETECCIÓN ----
-            // 1. Servicio por índices
+            // Detecciones
             if (textPayload) {
                 const servicioDetectado = detectarServicioConIndices(textPayload);
                 if (servicioDetectado) {
@@ -1996,7 +2268,6 @@
                 }
             }
 
-            // 2. Despacho por índices
             if (textPayload) {
                 const despachoDetectado = detectarDespachoConIndices(textPayload);
                 if (despachoDetectado) {
@@ -2014,7 +2285,6 @@
                 }
             }
 
-            // 3. Despacho en JSON
             if (jsonPayload && typeof jsonPayload === 'object') {
                 if (contieneDespacho(jsonPayload)) {
                     console.log('[DESPACHO] Despacho detectado en objeto JSON');
@@ -2037,7 +2307,6 @@
                 }
             }
 
-            // 4. Despacho en string plano
             if (textPayload && textPayload.includes('Tiene Despacho')) {
                 console.log('[DESPACHO] Despacho detectado en string plano');
                 limpiarDatosRuta();
@@ -2046,32 +2315,25 @@
                 return;
             }
 
-            // 5. Parsers para otros tipos (servicio, detalle, monitor, etc.)
+            // Parsers
             if (jsonPayload && typeof jsonPayload === 'object') {
-                // Servicio (objeto con tvDespatchNumber)
                 const servicioParsed = parseServicio(jsonPayload);
                 if (servicioParsed) {
                     renderServicio(servicioParsed);
                     return;
                 }
-
-                // Detalle de servicios
                 const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
                 if (detalleServiciosParsed) {
                     renderDetalleServicios(detalleServiciosParsed);
                     updateTimestamp();
                     return;
                 }
-
-                // Detalle de parada
                 const detalleParadaParsed = parseDetalleParada(jsonPayload);
                 if (detalleParadaParsed) {
                     renderDetalleParada(detalleParadaParsed);
                     updateTimestamp();
                     return;
                 }
-
-                // Monitor
                 const monitorParsed = parseMonitor(jsonPayload);
                 if (monitorParsed) {
                     renderMonitor(monitorParsed);
@@ -2081,7 +2343,6 @@
                 }
             }
 
-            // ---- Si no se reconoció nada ----
             if (textPayload) {
                 setToast('📩 Datos recibidos (no reconocidos)', 'info');
                 console.log('[PROCESS] Mensaje no reconocido (texto):', textPayload);
@@ -2096,86 +2357,6 @@
         } catch (e) {
             console.error('[PROCESS] Error en processIncomingMessage:', e);
             setToast('❌ Error al procesar mensaje: ' + e.message, 'error');
-        }
-    }
-
-    // =============================================================
-    // ENVÍO DE COMANDOS
-    // =============================================================
-    function sendCommand(cmd) {
-        if (!cmd) return;
-        const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
-        setToast(`📤 Enviando "${cmd}"...`, 'info');
-        console.log('[COMANDO] Enviando:', cmd);
-        fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-cache' })
-            .then(() => setToast(`✅ Comando "${cmd}" enviado`, 'success'))
-            .catch(err => setToast(`❌ Error: ${err.message}`, 'error'));
-    }
-
-    document.querySelectorAll('[data-cmd]').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const cmd = this.getAttribute('data-cmd');
-            this.style.transform = 'scale(0.92)';
-            setTimeout(() => this.style.transform = '', 150);
-            sendCommand(cmd);
-        });
-    });
-
-    // =============================================================
-    // CONEXIÓN NTFY
-    // =============================================================
-    function connectToNtfy() {
-        setToast('🔄 Conectando a ntfy.sh...', 'info');
-        setStatus(false, 'Conectando...');
-        console.log('[NTFY] Conectando...');
-
-        try {
-            if (eventSource) {
-                eventSource.close();
-                eventSource = null;
-            }
-
-            eventSource = new EventSource(NTFY_SSE_URL);
-
-            eventSource.onopen = function() {
-                setToast('✅ Conectado, esperando datos...', 'success');
-                setStatus(true, 'Conectado');
-                lastMessageTime = Date.now();
-                console.log('[NTFY] Conexión SSE establecida');
-            };
-
-            eventSource.onmessage = function(event) {
-                const raw = event.data;
-                if (raw === 'ping' || raw === 'keepalive') return;
-                lastMessageTime = Date.now();
-                setStatus(true, 'Conectado');
-                console.log('[NTFY] Mensaje recibido:', raw);
-                processIncomingMessage(raw);
-            };
-
-            eventSource.onerror = function() {
-                setStatus(false, 'NO CONECTADO');
-                setToast('⚠️ Error en conexión ntfy', 'error');
-                console.error('[NTFY] Error en conexión SSE');
-                setTimeout(() => {
-                    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-                        connectToNtfy();
-                    }
-                }, 10000);
-            };
-
-            setInterval(() => {
-                if (connected && Date.now() - lastMessageTime > 15000) {
-                    setStatus(false, 'NO CONECTADO');
-                    setToast('⏳ Sin datos desde hace 15s', 'warning');
-                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
-                }
-            }, 5000);
-
-        } catch (e) {
-            setToast('❌ Error al conectar: ' + e.message, 'error');
-            setStatus(false, 'NO CONECTADO');
-            console.error('[NTFY] Error al conectar:', e);
         }
     }
 
@@ -2333,11 +2514,15 @@
     // =============================================================
     renderMonitor({ tableData: [] });
     updateTimestamp();
+    // Mostrar configuración si no existe
+    mostrarConfigSiNoExiste();
     connectToNtfy();
     setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
 
     console.log('✅ Aplicación iniciada correctamente');
+    console.log('📡 Webhook URL:', WEBHOOK_URL);
+    console.log('📡 Ntfy topic:', NTFY_TOPIC);
     </script>
 </body>
-</html>
+    </html>
