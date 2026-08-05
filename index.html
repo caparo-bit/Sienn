@@ -16,6 +16,8 @@
     <meta name="apple-mobile-web-app-title" content="Smart TD" />
     <meta name="mobile-web-app-capable" content="yes" />
 
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --bg-dark: #08111f;
@@ -483,9 +485,27 @@
             font-size: 0.95rem;
             line-height: 1.6;
         }
+        .modal-box .modal-content .despacho-distancia {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #1e3a5a;
+            display: flex;
+            justify-content: space-around;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #b3d9ff;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .modal-box .modal-content .despacho-distancia span {
+            background: #142438;
+            padding: 4px 12px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
         .modal-box .modal-buttons {
             display: flex;
-            gap: 14px;
+            gap: 10px;
             justify-content: center;
             margin-top: 4px;
         }
@@ -495,7 +515,7 @@
             border: none;
             border-radius: 40px;
             font-weight: 800;
-            font-size: 1.1rem;
+            font-size: 1.0rem;
             cursor: pointer;
             transition: transform 0.1s;
             -webkit-tap-highlight-color: transparent;
@@ -504,6 +524,44 @@
         .modal-box .modal-buttons button:active { transform: scale(0.94); }
         .modal-box .modal-buttons .btn-accept { background: #0f7b3a; color: #e0f2e0; }
         .modal-box .modal-buttons .btn-reject { background: #7b1f1f; color: #fcd0d0; }
+        .modal-box .modal-buttons .btn-map { background: #1e3a5a; color: #4fa8ff; flex: 0.7; }
+
+        /* ===== PANTALLA DE MAPA ===== */
+        #viewMapa {
+            height: 80vh;
+            display: none;
+            flex-direction: column;
+            background: #08111f;
+        }
+        #viewMapa.active {
+            display: flex;
+        }
+        #map {
+            flex: 1;
+            width: 100%;
+            background: #1a2a3a;
+        }
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: #0f1f33;
+            border-bottom: 1px solid #1e3a5a;
+        }
+        .map-header .close-map {
+            background: none;
+            border: none;
+            color: #f0f4fa;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 8px;
+        }
+        .map-header .map-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #f4c542;
+        }
 
         /* Panel de Pruebas (Manual Simulator) */
         .demo-bar {
@@ -537,6 +595,7 @@
             td, th { padding: 6px 2px; } 
             .tile .tile-count { font-size: 1.1rem; } 
             .modal-box { padding: 16px 14px; }
+            .modal-box .modal-buttons button { font-size: 0.9rem; padding: 14px 8px; }
         }
         @media (min-width:600px) {
             .modal-box { max-width: 550px; padding: 30px 28px 24px; }
@@ -703,6 +762,18 @@
             </div>
         </div>
 
+        <!-- ======================================================= -->
+        <!-- PANTALLA DE MAPA (NUEVA)                               -->
+        <!-- ======================================================= -->
+        <div id="viewMapa" class="view-screen">
+            <div class="map-header">
+                <span class="close-map" id="closeMap">✕</span>
+                <span class="map-title">🗺️ Ruta al despacho</span>
+                <span style="width:28px;"></span>
+            </div>
+            <div id="map"></div>
+        </div>
+
         <!-- NOTIFICACIÓN TOAST GLOBAL -->
         <div class="toast" id="toast">💡 Esperando datos...</div>
 
@@ -716,6 +787,7 @@
                 </div>
                 <div class="modal-content" id="modalContent"></div>
                 <div class="modal-buttons">
+                    <button class="btn-map" id="modalMap">🗺️ Mapa</button>
                     <button class="btn-reject" id="modalReject">❌ CANCELAR</button>
                     <button class="btn-accept" id="modalAccept">✅ ACEPTAR</button>
                 </div>
@@ -723,7 +795,9 @@
         </div>
     </div>
 
-<script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
     // -------------------------------------------------------------
     // REGISTRO DE SERVICE WORKER INLINE (PWA Single-File)
     // -------------------------------------------------------------
@@ -793,6 +867,7 @@
     const viewServicio = document.getElementById('viewServicio');
     const viewDetalleParada = document.getElementById('viewDetalleParada');
     const viewDetalleServicios = document.getElementById('viewDetalleServicios');
+    const viewMapa = document.getElementById('viewMapa');
     const modalOverlay = document.getElementById('modalOverlay');
 
     const zoneTitleEl = document.getElementById('zoneTitle');
@@ -809,6 +884,7 @@
     const modalContent = document.getElementById('modalContent');
     const modalAccept = document.getElementById('modalAccept');
     const modalReject = document.getElementById('modalReject');
+    const modalMap = document.getElementById('modalMap');
 
     // Elementos de la pantalla de detalle de parada
     const stopHeaderTitleEl = document.getElementById('stopHeaderTitle');
@@ -833,6 +909,18 @@
     let despachoAudioInterval = null;
     let despachoTimeout = null;
 
+    // Variables para mapa y geolocalización
+    let userLat = null;
+    let userLon = null;
+    let despachoLat = null;
+    let despachoLon = null;
+    let despachoDireccion = '';
+    let despachoDistancia = null; // en km
+    let despachoTiempo = null; // en minutos
+    let routeGeometry = null; // array de [lat, lon] para dibujar
+    let mapInstance = null;
+    let mapInitialized = false;
+
     // -------------------------------------------------------------
     // MÁQUINA DE ESTADOS DE VISTAS
     // -------------------------------------------------------------
@@ -841,20 +929,18 @@
     const STATE_SERVICIO = 'SERVICIO';
     const STATE_DETALLE_PARADA = 'DETALLE_PARADA';
     const STATE_DETALLE_SERVICIOS = 'DETALLE_SERVICIOS';
+    const STATE_MAPA = 'MAPA';
 
     let currentViewState = STATE_MONITOR;
 
-    /**
-     * Alterna la pantalla activa de forma limpia garantizando que nunca se solapen
-     */
     function setViewState(newState) {
         currentViewState = newState;
         
-        // Desactivar todas las vistas principales primero
         viewMonitor.classList.remove('active');
         viewServicio.classList.remove('active');
         viewDetalleParada.classList.remove('active');
         viewDetalleServicios.classList.remove('active');
+        viewMapa.classList.remove('active');
 
         if (newState === STATE_MONITOR) {
             ocultarModal();
@@ -869,19 +955,204 @@
             ocultarModal();
             viewDetalleServicios.classList.add('active');
         } else if (newState === STATE_OFERTA) {
-            // La oferta es una capa modal sobre la pantalla activa
             modalOverlay.classList.add('active');
+        } else if (newState === STATE_MAPA) {
+            ocultarModal();
+            viewMapa.classList.add('active');
+            if (!mapInitialized) {
+                initMap();
+            }
+            actualizarMapa();
         }
     }
 
-    // Botón de cabecera Atrás para volver al monitor
     document.getElementById('headerBack').addEventListener('click', () => {
         setViewState(STATE_MONITOR);
         setToast('📊 Monitor de zonas', 'info');
     });
 
+    document.getElementById('closeMap').addEventListener('click', () => {
+        setViewState(STATE_OFERTA);
+    });
+
+    modalMap.addEventListener('click', () => {
+        if (despachoLat && despachoLon) {
+            setViewState(STATE_MAPA);
+        } else {
+            setToast('⏳ Ubicación del despacho no disponible', 'warning');
+        }
+    });
+
     // -------------------------------------------------------------
-    // SISTEMA DE AUDIO (Web Audio API) Y VIBRACIÓN
+    // GEOLOCALIZACIÓN, GEOCODIFICACIÓN Y RUTAS (OSRM)
+    // -------------------------------------------------------------
+    function obtenerPosicionUsuario() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve(null);
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    userLat = pos.coords.latitude;
+                    userLon = pos.coords.longitude;
+                    resolve({ lat: userLat, lon: userLon });
+                },
+                (err) => {
+                    console.warn('Geolocation error:', err);
+                    resolve(null);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }
+
+    async function geocodificarDireccion(direccion) {
+        if (!direccion || direccion.trim() === '') return null;
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(direccion)}&format=json&limit=1`;
+            const response = await fetch(url, {
+                headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
+            });
+            const data = await response.json();
+            if (data && data.length > 0) {
+                return {
+                    lat: parseFloat(data[0].lat),
+                    lon: parseFloat(data[0].lon)
+                };
+            }
+            return null;
+        } catch (e) {
+            console.warn('Geocoding error:', e);
+            return null;
+        }
+    }
+
+    // OSRM: devuelve { distancia_km, tiempo_min, geometry: [[lat,lon],...] } o null
+    async function obtenerRutaOSRM(originLat, originLon, destLat, destLon) {
+        try {
+            const url = `https://router.project-osrm.org/route/v1/driving/${originLon},${originLat};${destLon},${destLat}?overview=full&geometries=geojson`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                const distancia = route.distance / 1000; // metros a km
+                const tiempo = route.duration / 60; // segundos a minutos
+                // Extraer geometría (array de [lat, lon])
+                const coords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                return {
+                    distancia_km: distancia,
+                    tiempo_min: tiempo,
+                    geometry: coords
+                };
+            }
+            return null;
+        } catch (e) {
+            console.warn('OSRM error:', e);
+            return null;
+        }
+    }
+
+    // Cálculo de distancia en línea recta (fallback)
+    function calcularDistanciaLineal(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function formatearDistancia(km) {
+        if (km < 0.5) return Math.round(km * 1000) + ' m';
+        return km.toFixed(1) + ' km';
+    }
+
+    function formatearTiempo(minutos) {
+        if (minutos < 1) return '< 1 min';
+        if (minutos < 60) return Math.round(minutos) + ' min';
+        const horas = Math.floor(minutos / 60);
+        const mins = Math.round(minutos % 60);
+        return horas + 'h ' + mins + 'min';
+    }
+
+    // -------------------------------------------------------------
+    // INICIALIZACIÓN DEL MAPA
+    // -------------------------------------------------------------
+    function initMap() {
+        if (mapInitialized) return;
+        const mapContainer = document.getElementById('map');
+        if (!mapContainer) return;
+
+        mapInstance = L.map(mapContainer, {
+            zoomControl: true,
+            fadeAnimation: true,
+            attributionControl: true
+        }).setView([40.4168, -3.7038], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(mapInstance);
+
+        mapInitialized = true;
+    }
+
+    function actualizarMapa() {
+        if (!mapInstance || !mapInitialized) return;
+        if (!userLat || !userLon || !despachoLat || !despachoLon) {
+            mapInstance.setView([40.4168, -3.7038], 13);
+            return;
+        }
+
+        // Limpiar capas anteriores (excepto tile layer)
+        mapInstance.eachLayer((layer) => {
+            if (layer instanceof L.Marker || layer instanceof L.Polyline || layer instanceof L.Polygon) {
+                mapInstance.removeLayer(layer);
+            }
+        });
+
+        // Marcador usuario
+        L.marker([userLat, userLon], {
+            icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
+        }).addTo(mapInstance).bindPopup('📍 Tu ubicación');
+
+        // Marcador despacho
+        L.marker([despachoLat, despachoLon], {
+            icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
+        }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
+
+        // Dibujar ruta si existe geometría
+        if (routeGeometry && routeGeometry.length > 1) {
+            L.polyline(routeGeometry, { color: '#4fa8ff', weight: 5, opacity: 0.8 })
+                .addTo(mapInstance)
+                .bindPopup(`🚗 ${formatearDistancia(despachoDistancia)} · ${formatearTiempo(despachoTiempo)}`);
+        } else {
+            // Línea recta como fallback
+            L.polyline([[userLat, userLon], [despachoLat, despachoLon]], {
+                color: '#ff4444',
+                weight: 2,
+                dashArray: '5,10',
+                opacity: 0.6
+            }).addTo(mapInstance).bindPopup('⚠️ Distancia en línea recta (sin ruta)');
+        }
+
+        // Ajustar vista
+        const bounds = L.latLngBounds([
+            [userLat, userLon],
+            [despachoLat, despachoLon]
+        ]);
+        if (routeGeometry && routeGeometry.length > 1) {
+            // Ampliar con la geometría de la ruta
+            const routeBounds = L.latLngBounds(routeGeometry);
+            bounds.extend(routeBounds);
+        }
+        mapInstance.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    // -------------------------------------------------------------
+    // SISTEMA DE AUDIO Y ALERTAS
     // -------------------------------------------------------------
     function initAudio() {
         if (!audioCtx) {
@@ -968,7 +1239,7 @@
     }
 
     // -------------------------------------------------------------
-    // FUNCIONES AUXILIARES DE UI
+    // FUNCIONES AUXILIARES UI
     // -------------------------------------------------------------
     function extractZoneName(titleText) {
         if (!titleText) return '';
@@ -1018,7 +1289,7 @@
     }
 
     // -------------------------------------------------------------
-    // NOTIFICACIONES PUSH NATIVAS
+    // NOTIFICACIONES PUSH
     // -------------------------------------------------------------
     function solicitarPermisoNotificaciones() {
         if ('Notification' in window && 'serviceWorker' in navigator) {
@@ -1053,7 +1324,7 @@
     }
 
     // -------------------------------------------------------------
-    // [NUEVO] FUNCIONES DE DETECCIÓN DE DESPACHO (copiadas de la versión simple)
+    // DETECCIÓN DE DESPACHO
     // -------------------------------------------------------------
     function contieneDespacho(valor) {
         if (typeof valor === 'string') {
@@ -1100,44 +1371,28 @@
     }
 
     // -------------------------------------------------------------
-    // PARSERS INDEPENDIENTES
+    // PARSERS
     // -------------------------------------------------------------
-
-    /**
-     * Parser para la Pantalla de Detalle de Servicios Reservados / Rutas (tvPickupTime, tvZoneName sin tabla)
-     */
     function parseDetalleServicios(data) {
         if (!data || typeof data !== 'object') return null;
-
         const normalized = {};
         for (const key in data) {
-            let newKey = key.startsWith('ifac.td.smarttd:id/') 
-                ? key.replace('ifac.td.smarttd:id/', '') 
-                : key;
+            let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-
-        // Si no tiene hora de recogida o no tiene botones característicos de esta vista
         if (!normalized.tvPickupTime && !normalized.txButtonText) return null;
-        
-        // Garantizar que no se confunda con el monitor
         if (normalized.tvOnStop || normalized.tvOnZone) return null;
 
         const timeKeys = Object.keys(normalized).filter(k => k === 'tvPickupTime' || k.startsWith('tvPickupTime$'));
         const times = [];
-
         timeKeys.forEach(key => {
             let index = 1;
             if (key.includes('$')) {
                 const match = key.match(/\$(\d+)$/);
                 if (match) index = parseInt(match[1], 10);
             }
-            times.push({
-                index: index,
-                time: normalized[key]
-            });
+            times.push({ index, time: normalized[key] });
         });
-
         times.sort((a, b) => a.index - b.index);
 
         return {
@@ -1147,37 +1402,25 @@
         };
     }
 
-    /**
-     * Parser para la Pantalla de Detalle de Parada / Vehículos (tvCarInfo, tvCarInfo$2...)
-     */
     function parseDetalleParada(data) {
         if (!data || typeof data !== 'object') return null;
-
         const normalized = {};
         for (const key in data) {
-            let newKey = key.startsWith('ifac.td.smarttd:id/') 
-                ? key.replace('ifac.td.smarttd:id/', '') 
-                : key;
+            let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-
         const carKeys = Object.keys(normalized).filter(k => k === 'tvCarInfo' || k.startsWith('tvCarInfo$'));
         if (carKeys.length === 0) return null;
 
         const carItems = [];
-
         carKeys.forEach(key => {
             let index = 1;
             if (key.includes('$')) {
                 const match = key.match(/\$(\d+)$/);
                 if (match) index = parseInt(match[1], 10);
             }
-            carItems.push({
-                index: index,
-                text: normalized[key]
-            });
+            carItems.push({ index, text: normalized[key] });
         });
-
         carItems.sort((a, b) => a.index - b.index);
 
         return {
@@ -1186,26 +1429,18 @@
         };
     }
 
-    /**
-     * Parser para el Estado 1: Monitor
-     */
     function parseMonitor(data) {
         if (!data || typeof data !== 'object') return null;
-
         const normalized = {};
         for (const key in data) {
-            let newKey = key.startsWith('ifac.td.smarttd:id/') 
-                ? key.replace('ifac.td.smarttd:id/', '') 
-                : key;
+            let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
 
-        // Verificar si contiene los campos requeridos para el monitor
         const tieneCamposMonitor = Object.keys(normalized).some(k => 
             k.startsWith('tvZoneName') || k.startsWith('tvOnStop') || 
             k.startsWith('tvOnZone') || k.startsWith('tvTrips') || k.startsWith('tvHired')
         );
-
         if (!tieneCamposMonitor) return null;
 
         const rowsMap = {};
@@ -1217,9 +1452,8 @@
         for (const key in normalized) {
             const val = normalized[key];
             let idx = -1;
-            if (key === 'tvZoneName') {
-                idx = 0;
-            } else if (key.startsWith('tvZoneName$')) {
+            if (key === 'tvZoneName') idx = 0;
+            else if (key.startsWith('tvZoneName$')) {
                 const match = key.match(/\$(\d+)$/);
                 if (match) idx = Math.max(0, parseInt(match[1], 10) - 1);
             }
@@ -1231,7 +1465,8 @@
         for (const key in normalized) {
             const match = key.match(/\$(\d+)$/);
             if (!match) continue;
-            const idx = Math.max(0, parseInt(match[1], 10) - 2);
+            const num = parseInt(match[1], 10);
+            const idx = Math.max(0, num - 2);
             const val = normalized[key];
             if (key.startsWith('tvOnStop')) getRow(idx).P = Number(val) || 0;
             else if (key.startsWith('tvOnZone')) getRow(idx).Z = Number(val) || 0;
@@ -1252,28 +1487,16 @@
         };
     }
 
-    /**
-     * Parser para el Estado 2: Oferta de Despacho (estructura exacta)
-     */
     function parseOferta(data) {
         if (!data || typeof data !== 'object') return null;
-
         const normalized = {};
-
         for (const key in data) {
-            let newKey = key.startsWith('ifac.td.smarttd:id/')
-                ? key.replace('ifac.td.smarttd:id/', '')
-                : key;
+            let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-
-        if (
-            !normalized.txInfoAction ||
-            !normalized.txInfoAction.includes("Tiene Despacho")
-        ) {
+        if (!normalized.txInfoAction || !normalized.txInfoAction.includes("Tiene Despacho")) {
             return null;
         }
-
         return {
             hora: normalized.txHour || "--:--",
             direccion: normalized.txSimpleAdress || "",
@@ -1283,26 +1506,15 @@
         };
     }
 
-    /**
-     * Parser para el Estado 3: Servicio Aceptado
-     */
     function parseServicio(data) {
         if (!data || typeof data !== 'object') return null;
-
         const normalized = {};
-
         for (const key in data) {
-            let newKey = key.startsWith('ifac.td.smarttd:id/')
-                ? key.replace('ifac.td.smarttd:id/', '')
-                : key;
-
+            let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-
         const numero = normalized.tvDespatchNumber || normalized.tvDispatchNumber;
-
         if (!numero) return null;
-
         return {
             number: numero,
             pickup: normalized.tvPickup || "",
@@ -1315,77 +1527,46 @@
     }
 
     // -------------------------------------------------------------
-    // RENDERS INDEPENDIENTES DE PANTALLAS
+    // RENDERS
     // -------------------------------------------------------------
-
-    /**
-     * Renderiza la pantalla de Detalle de Servicios Reservados / Rutas
-     */
     function renderDetalleServicios(routeData) {
         zoneTitleEl.textContent = routeData.title;
         routeZoneNameEl.textContent = routeData.zoneName;
-
         let html = '';
         routeData.times.forEach(item => {
-            html += `
-                <div class="route-item">
-                    <span>🕒</span>
-                    <span>${escapeHtml(item.time)}</span>
-                </div>
-            `;
+            html += `<div class="route-item"><span>🕒</span><span>${escapeHtml(item.time)}</span></div>`;
         });
-
         routeListEl.innerHTML = html;
         setViewState(STATE_DETALLE_SERVICIOS);
         setToast(`🕒 Servicios de ruta (${routeData.times.length})`, 'info');
     }
 
-    /**
-     * Renderiza la pantalla de Detalle de Parada / Vehículos
-     */
     function renderDetalleParada(stopData) {
         stopHeaderTitleEl.textContent = stopData.title;
         zoneTitleEl.textContent = stopData.title;
-
         let html = '';
         stopData.cars.forEach(car => {
-            html += `
-                <div class="stop-item">
-                    <span class="stop-item-index">${car.index}</span>
-                    <div class="stop-item-pill">${escapeHtml(car.text)}</div>
-                </div>
-            `;
+            html += `<div class="stop-item"><span class="stop-item-index">${car.index}</span><div class="stop-item-pill">${escapeHtml(car.text)}</div></div>`;
         });
-
         stopCarListEl.innerHTML = html;
         setViewState(STATE_DETALLE_PARADA);
         setToast(`📍 Detalle de parada (${stopData.cars.length} vehículos)`, 'info');
     }
 
-    /**
-     * Renderiza Pantalla 1: Monitor
-     */
     function renderMonitor(monitorData) {
         setViewState(STATE_MONITOR);
-
-        if (monitorData.headerText) {
-            zoneTitleEl.textContent = monitorData.headerText;
-        }
-        if (monitorData.bottomBarText) {
-            libreBtn.textContent = monitorData.bottomBarText.toUpperCase();
-        }
+        if (monitorData.headerText) zoneTitleEl.textContent = monitorData.headerText;
+        if (monitorData.bottomBarText) libreBtn.textContent = monitorData.bottomBarText.toUpperCase();
 
         const data = monitorData.tableData || [];
         const currentZone = currentZoneName();
         let html = '';
-
         data.forEach(row => {
             const isCurrent = (row.name || '').trim().toUpperCase() === currentZone;
             const pClass = Number(row.P) > 0 ? 'num pos-p' : 'num';
             const zClass = Number(row.Z) > 0 ? 'num pos-z' : 'num';
             const sClass = Number(row.S) > 0 ? 'num pos-s' : 'num';
             const rClass = Number(row.R) > 0 ? 'num pos-r' : 'num';
-
             html += `<tr class="${isCurrent ? 'current-zone' : ''}">
                         <td class="row-label">${escapeHtml(row.name)}</td>
                         <td class="${pClass}">${row.P}</td>
@@ -1394,52 +1575,121 @@
                         <td class="${rClass}">${row.R}</td>
                     </tr>`;
         });
-
         tableBody.innerHTML = html;
 
         const totalP = data.reduce((a, r) => a + (Number(r.P) || 0), 0);
         const totalZ = data.reduce((a, r) => a + (Number(r.Z) || 0), 0);
         const totalS = data.reduce((a, r) => a + (Number(r.S) || 0), 0);
         const totalR = data.reduce((a, r) => a + (Number(r.R) || 0), 0);
-
         pendientesEl.textContent = totalP;
         serviciosEl.textContent = totalS;
         vehiculosEl.textContent = totalZ + totalR;
     }
 
-    /**
-     * Renderiza Estado 2: Modal de Oferta de Despacho (estructura formateada)
-     */
-    function renderOferta(ofertaData) {
-        modalContent.innerHTML = `
-            <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(ofertaData.hora)}</div>
-            <div style="margin-bottom:12px; line-height:1.5;">
-                ${escapeHtml(ofertaData.direccion)}<br>
-                ${escapeHtml(ofertaData.ciudad)}<br>
-                <b>Zona:</b> ${escapeHtml(ofertaData.zona)}
+    // Renderizado del despacho con distancia y tiempo
+    async function renderDespachoConRuta(direccionTexto, ciudad, zona, hora, pregunta) {
+        // Obtener ubicación del usuario
+        const userPos = await obtenerPosicionUsuario();
+        if (!userPos) {
+            setToast('⚠️ No se pudo obtener tu ubicación', 'warning');
+            // Mostrar modal sin distancia
+            mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
+            return;
+        }
+
+        userLat = userPos.lat;
+        userLon = userPos.lon;
+
+        // Geocodificar dirección completa
+        const dirCompleta = direccionTexto + ', ' + ciudad;
+        const coords = await geocodificarDireccion(dirCompleta);
+        if (!coords) {
+            setToast('⚠️ No se pudo geolocalizar la dirección', 'warning');
+            // Mostrar modal sin distancia
+            mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
+            return;
+        }
+
+        despachoLat = coords.lat;
+        despachoLon = coords.lon;
+        despachoDireccion = dirCompleta;
+
+        // Calcular ruta OSRM
+        const ruta = await obtenerRutaOSRM(userLat, userLon, despachoLat, despachoLon);
+        let distanciaKm, tiempoMin, geometria;
+        if (ruta) {
+            distanciaKm = ruta.distancia_km;
+            tiempoMin = ruta.tiempo_min;
+            geometria = ruta.geometry;
+            despachoDistancia = distanciaKm;
+            despachoTiempo = tiempoMin;
+            routeGeometry = geometria;
+        } else {
+            // Fallback a línea recta
+            distanciaKm = calcularDistanciaLineal(userLat, userLon, despachoLat, despachoLon);
+            tiempoMin = distanciaKm / 30 * 60; // 30 km/h aprox
+            despachoDistancia = distanciaKm;
+            despachoTiempo = tiempoMin;
+            routeGeometry = null;
+            setToast('⚠️ Ruta por carretera no disponible, usando distancia lineal', 'warning');
+        }
+
+        // Construir HTML del modal
+        const html = `
+            <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(hora)}</div>
+            <div style="margin-bottom:8px; line-height:1.5;">
+                ${escapeHtml(direccionTexto)}<br>
+                ${escapeHtml(ciudad)}<br>
+                <b>Zona:</b> ${escapeHtml(zona)}
             </div>
-            <div style="border-top:1px solid #1e3a5a; padding-top:12px; font-weight:700; text-align:center; color:#fff;">
-                ${escapeHtml(ofertaData.pregunta)}
+            <div class="despacho-distancia">
+                <span>🚗 ${formatearDistancia(distanciaKm)}</span>
+                <span>⏱️ ${formatearTiempo(tiempoMin)}</span>
+            </div>
+            <div style="border-top:1px solid #1e3a5a; padding-top:12px; margin-top:8px; font-weight:700; text-align:center; color:#fff;">
+                ${escapeHtml(pregunta)}
             </div>
         `;
-
+        modalContent.innerHTML = html;
         setViewState(STATE_OFERTA);
-
         iniciarAlertaDespacho();
-
-        lanzarNotificacionNativa(
-            ofertaData.direccion + " - " + ofertaData.ciudad
-        );
+        lanzarNotificacionNativa(direccionTexto + ' - ' + ciudad + ' (a ' + formatearDistancia(distanciaKm) + ')');
     }
 
-    /**
-     * Renderiza el modal de despacho con texto plano (fallback)
-     */
+    function mostrarModalSimple(direccion, ciudad, zona, hora, pregunta) {
+        const html = `
+            <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(hora)}</div>
+            <div style="margin-bottom:8px; line-height:1.5;">
+                ${escapeHtml(direccion)}<br>
+                ${escapeHtml(ciudad)}<br>
+                <b>Zona:</b> ${escapeHtml(zona)}
+            </div>
+            <div style="border-top:1px solid #1e3a5a; padding-top:12px; margin-top:8px; font-weight:700; text-align:center; color:#fff;">
+                ${escapeHtml(pregunta)}
+            </div>
+        `;
+        modalContent.innerHTML = html;
+        setViewState(STATE_OFERTA);
+        iniciarAlertaDespacho();
+        lanzarNotificacionNativa(direccion + ' - ' + ciudad);
+    }
+
     function renderDespachoSimple(texto) {
         modalContent.textContent = texto;
         setViewState(STATE_OFERTA);
         iniciarAlertaDespacho();
         lanzarNotificacionNativa(texto.substring(0, 100) + '...');
+    }
+
+    function renderServicio(servicioData) {
+        srvNumberEl.textContent = `Nº ${servicioData.number}`;
+        srvStatusEl.textContent = servicioData.status.toUpperCase();
+        srvTimeEl.textContent = servicioData.time;
+        srvZoneEl.textContent = servicioData.zone || "---";
+        srvAddressEl.textContent = servicioData.address || servicioData.pickup || "---";
+        srvObsEl.textContent = servicioData.notes || "Sin observaciones";
+        setViewState(STATE_SERVICIO);
+        setToast('🚕 Servicio en curso', 'info');
     }
 
     function ocultarModal() {
@@ -1461,26 +1711,10 @@
         setToast("❌ Despacho rechazado", "error");
     });
 
-    /**
-     * Renderiza Pantalla 3: Servicio Aceptado
-     */
-    function renderServicio(servicioData) {
-        srvNumberEl.textContent = `Nº ${servicioData.number}`;
-        srvStatusEl.textContent = servicioData.status.toUpperCase();
-        srvTimeEl.textContent = servicioData.time;
-        srvZoneEl.textContent = servicioData.zone || "---";
-        srvAddressEl.textContent = servicioData.address || servicioData.pickup || "---";
-        srvObsEl.textContent = servicioData.notes || "Sin observaciones";
-
-        setViewState(STATE_SERVICIO);
-        setToast('🚕 Servicio en curso', 'info');
-    }
-
     // -------------------------------------------------------------
-    // PROCESADOR GENERAL DE MENSAJES (DISPATCHER DE ESTADOS)
+    // PROCESADOR GENERAL DE MENSAJES
     // -------------------------------------------------------------
-    function processIncomingMessage(rawPayload) {
-        // Intentar parsear como JSON si es string
+    async function processIncomingMessage(rawPayload) {
         let jsonPayload = null;
         let esStringPlano = false;
 
@@ -1490,7 +1724,6 @@
                 try {
                     jsonPayload = JSON.parse(trimmed);
                 } catch (_) {
-                    // No es JSON, lo tratamos como string plano
                     jsonPayload = trimmed;
                     esStringPlano = true;
                 }
@@ -1502,7 +1735,7 @@
             jsonPayload = rawPayload;
         }
 
-        // Si el payload viene envuelto por ntfy en .message
+        // Desenvolver mensaje de ntfy
         if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
             if (typeof jsonPayload.message === 'string') {
                 const trimmedMsg = jsonPayload.message.trim();
@@ -1522,10 +1755,7 @@
             }
         }
 
-        // -------------------------------------------------------------
-        // PASO 1: DETECCIÓN DE DESPACHO (copiado de la versión simple)
-        // Se ejecuta ANTES de cualquier otro parseo.
-        // -------------------------------------------------------------
+        // 1. Detectar despacho
         let esDespacho = false;
         let textoDespacho = '';
 
@@ -1538,36 +1768,36 @@
             esDespacho = contieneDespacho(jsonPayload);
             if (esDespacho) {
                 textoDespacho = extraerTextoDespacho(jsonPayload);
-                if (!textoDespacho) {
-                    textoDespacho = JSON.stringify(jsonPayload, null, 2);
-                }
+                if (!textoDespacho) textoDespacho = JSON.stringify(jsonPayload, null, 2);
             }
         }
 
         if (esDespacho) {
-            // Intentar parsear como oferta estructurada para mostrar bonito
             const ofertaParsed = parseOferta(jsonPayload);
             if (ofertaParsed) {
-                renderOferta(ofertaParsed);
+                // Renderizar con ruta (llamada asíncrona)
+                await renderDespachoConRuta(
+                    ofertaParsed.direccion,
+                    ofertaParsed.ciudad,
+                    ofertaParsed.zona,
+                    ofertaParsed.hora,
+                    ofertaParsed.pregunta
+                );
             } else {
                 renderDespachoSimple(textoDespacho);
             }
             setToast('📨 ¡Nuevo despacho!', 'warning');
-            return; // IMPORTANTE: salir, no procesar como otros estados
+            return;
         }
 
-        // -------------------------------------------------------------
-        // PASO 2: Si no es despacho, procesar el resto de estados
-        // -------------------------------------------------------------
-
-        // 2. ¿Es un Servicio Aceptado/Asignado?
+        // 2. Servicio aceptado
         const servicioParsed = parseServicio(jsonPayload);
         if (servicioParsed) {
             renderServicio(servicioParsed);
             return;
         }
 
-        // 3. ¿Es un detalle de Servicios Reservados / Rutas?
+        // 3. Detalle servicios
         const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
         if (detalleServiciosParsed) {
             renderDetalleServicios(detalleServiciosParsed);
@@ -1575,7 +1805,7 @@
             return;
         }
 
-        // 4. ¿Es una lista de Detalle de Parada / Vehículos?
+        // 4. Detalle parada
         const detalleParadaParsed = parseDetalleParada(jsonPayload);
         if (detalleParadaParsed) {
             renderDetalleParada(detalleParadaParsed);
@@ -1583,7 +1813,7 @@
             return;
         }
 
-        // 5. ¿Es una actualización del Monitor?
+        // 5. Monitor
         const monitorParsed = parseMonitor(jsonPayload);
         if (monitorParsed) {
             renderMonitor(monitorParsed);
@@ -1592,14 +1822,13 @@
             return;
         }
 
-        // Si no se reconoció, mostrar un toast informativo
         if (jsonPayload && typeof jsonPayload === 'object') {
             setToast('⚠️ Datos no reconocidos', 'warning');
         }
     }
 
     // -------------------------------------------------------------
-    // ENVÍO DE COMANDOS WEBHOOK
+    // ENVÍO DE COMANDOS
     // -------------------------------------------------------------
     function sendCommand(cmd) {
         if (!cmd) return;
@@ -1620,7 +1849,7 @@
     });
 
     // -------------------------------------------------------------
-    // CONEXIÓN A NTFY SSE
+    // CONEXIÓN A NTFY
     // -------------------------------------------------------------
     function connectToNtfy() {
         setToast('🔄 Conectando a ntfy.sh...', 'info');
@@ -1645,7 +1874,6 @@
                 if (raw === 'ping' || raw === 'keepalive') return;
                 lastMessageTime = Date.now();
                 setStatus(true, 'Conectado');
-                
                 processIncomingMessage(raw);
             };
 
@@ -1673,7 +1901,7 @@
     }
 
     // -------------------------------------------------------------
-    // CONTROLES MANUALES Y DE PRUEBA
+    // PRUEBAS MANUALES
     // -------------------------------------------------------------
     document.getElementById('btnTestOferta').addEventListener('click', () => {
         processIncomingMessage({
@@ -1691,7 +1919,7 @@
             tvPickupTime: "12:45",
             tvPickup: "Calle de Alcalá, 42",
             tvZona: "CENTRO - RETIRO",
-            tvText: "Pasar a recoger en la puerta principal. Cliente paga con tarjeta.",
+            tvText: "Pasar a recoger en la puerta principal.",
             txInfoStateBottomBar: "DESPACHADO"
         });
     });
@@ -1735,7 +1963,6 @@
         });
     });
 
-    // Triple click en título para disparar prueba de despacho rápida (estilo simple)
     let titleClicks = 0;
     zoneTitleEl.addEventListener('click', function() {
         titleClicks++;
@@ -1753,7 +1980,7 @@
     });
 
     // -------------------------------------------------------------
-    // WAKE LOCK (Mantener Pantalla Encendida)
+    // WAKE LOCK
     // -------------------------------------------------------------
     let wakeLock = null;
     async function solicitarWakeLock() {
@@ -1770,13 +1997,13 @@
     });
 
     // -------------------------------------------------------------
-    // INICIALIZACIÓN DE LA APLICACIÓN
+    // INICIALIZACIÓN
     // -------------------------------------------------------------
     renderMonitor({ tableData: [] });
     updateTimestamp();
     connectToNtfy();
     setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
-</script>
+    </script>
 </body>
-</html>
+    </html>
