@@ -593,53 +593,47 @@
             cursor: pointer;
         }
 
-        /* Configuración webhook y ntfy */
-        .config-field {
-            margin-bottom: 12px;
-        }
-        .config-field label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-        }
-        .config-field input {
-            width: 100%;
-            padding: 10px 14px;
+        /* Configuración webhook */
+        .webhook-config {
+            margin: 8px 14px 0;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: #0a1628;
+            padding: 6px 10px;
             border-radius: 30px;
             border: 1px solid #1e3a5a;
-            background: #0a1628;
-            color: #fff;
-            font-size: 0.9rem;
-            outline: none;
         }
-        .config-field input:focus {
-            border-color: #4fa8ff;
-        }
-        .config-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 8px;
-        }
-        .config-actions button {
+        .webhook-config input {
             flex: 1;
-            padding: 12px;
+            background: transparent;
             border: none;
-            border-radius: 40px;
-            font-weight: 700;
-            cursor: pointer;
-        }
-        .config-actions .btn-save {
-            background: #0f7b3a;
-            color: #e0f2e0;
-        }
-        .config-actions .btn-close {
-            background: #1e3a5a;
             color: #b3d9ff;
+            font-size: 0.7rem;
+            padding: 4px 6px;
+            outline: none;
+            min-width: 120px;
         }
+        .webhook-config button {
+            background: #1e3a5a;
+            border: none;
+            border-radius: 20px;
+            color: #b3d9ff;
+            font-size: 0.6rem;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .webhook-config .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .webhook-config .status-dot.ok { background: var(--accent-green); }
+        .webhook-config .status-dot.error { background: var(--accent-red); }
+        .webhook-config .status-dot.unknown { background: #5c7ea0; }
 
         @media (max-width:420px) { 
             .btn-grid .btn { font-size: 0.62rem; padding: 10px 0; } 
@@ -662,7 +656,7 @@
         <div class="header">
             <div class="back" id="headerBack">‹</div>
             <div class="title" id="zoneTitle">Z: CARGANDO...</div>
-            <div class="filter" id="headerFilter" title="Ajustes">⚙️</div>
+            <div class="filter" id="headerFilter">⏷</div>
         </div>
         <div class="header-strip"></div>
         <div class="subbar">
@@ -722,6 +716,15 @@
                         <span title="Escanear">🪪</span>
                     </div>
                     <div class="libre-btn" data-cmd="libre" id="libreBtn">LIBRE</div>
+                </div>
+
+                <!-- Configuración del webhook -->
+                <div class="webhook-config">
+                    <span style="font-size:0.6rem;color:#5c7ea0;">🔗</span>
+                    <input type="text" id="webhookUrlInput" placeholder="URL del webhook" />
+                    <button id="btnTestWebhook">🔍 Probar</button>
+                    <button id="btnSaveWebhook">💾 Guardar</button>
+                    <span class="status-dot unknown" id="webhookStatusDot"></span>
                 </div>
 
                 <div class="demo-bar">
@@ -812,7 +815,7 @@
         <!-- TOAST -->
         <div class="toast" id="toast">💡 Esperando datos...</div>
 
-        <!-- MODAL DE DESPACHO -->
+        <!-- MODAL -->
         <div class="modal-overlay" id="modalOverlay">
             <div class="modal-box">
                 <div class="modal-title"><span>📨 DESPACHO</span></div>
@@ -829,45 +832,17 @@
                 </div>
             </div>
         </div>
-
-        <!-- MODAL DE CONFIGURACIÓN (webhook y ntfy) -->
-        <div class="modal-overlay" id="configOverlay">
-            <div class="modal-box">
-                <div class="modal-title"><span>⚙️ CONFIGURACIÓN</span></div>
-                <div class="modal-content" style="max-height:60vh; overflow-y:auto;">
-                    <div class="config-field">
-                        <label>🔗 URL del Webhook</label>
-                        <input type="text" id="configWebhook" placeholder="https://trigger.macrodroid.com/..." />
-                    </div>
-                    <div class="config-field">
-                        <label>📡 Topic de ntfy</label>
-                        <input type="text" id="configNtfyTopic" placeholder="smarttd-monitor" />
-                    </div>
-                    <div style="font-size:0.7rem; color:#5c7ea0; margin-top:6px;">
-                        💡 Los cambios se aplican al guardar y se reinicia la conexión.
-                    </div>
-                </div>
-                <div class="config-actions">
-                    <button class="btn-close" id="configClose">CERRAR</button>
-                    <button class="btn-save" id="configSave">💾 GUARDAR</button>
-                </div>
-            </div>
-        </div>
-
     </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
     // =============================================================
-    // CONFIGURACIÓN CARGADA DESDE localStorage
+    // CONFIGURACIÓN
     // =============================================================
-    const DEFAULT_WEBHOOK = 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
-    const DEFAULT_NTFY_TOPIC = 'smarttd-monitor';
-
-    let WEBHOOK_URL = localStorage.getItem('smarttd_webhook_url') || DEFAULT_WEBHOOK;
-    let NTFY_TOPIC = localStorage.getItem('smarttd_ntfy_topic') || DEFAULT_NTFY_TOPIC;
-    const NTFY_SSE_URL = () => `https://ntfy.sh/${NTFY_TOPIC}/sse`;
+    let WEBHOOK_URL = localStorage.getItem('smarttd_webhook_url') || 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
+    const NTFY_TOPIC = 'smarttd-monitor';
+    const NTFY_SSE_URL = `https://ntfy.sh/${NTFY_TOPIC}/sse`;
 
     // =============================================================
     // REFERENCIAS DOM
@@ -878,7 +853,6 @@
     const viewDetalleServicios = document.getElementById('viewDetalleServicios');
     const viewMapa = document.getElementById('viewMapa');
     const modalOverlay = document.getElementById('modalOverlay');
-    const configOverlay = document.getElementById('configOverlay');
 
     const zoneTitleEl = document.getElementById('zoneTitle');
     const tableBody = document.getElementById('tableBody');
@@ -900,12 +874,10 @@
     const inputDireccionCorregida = document.getElementById('inputDireccionCorregida');
     const btnAplicarCorreccion = document.getElementById('btnAplicarCorreccion');
 
-    // Configuración
-    const configWebhook = document.getElementById('configWebhook');
-    const configNtfyTopic = document.getElementById('configNtfyTopic');
-    const configSave = document.getElementById('configSave');
-    const configClose = document.getElementById('configClose');
-    const headerFilter = document.getElementById('headerFilter');
+    const webhookUrlInput = document.getElementById('webhookUrlInput');
+    const btnTestWebhook = document.getElementById('btnTestWebhook');
+    const btnSaveWebhook = document.getElementById('btnSaveWebhook');
+    const webhookStatusDot = document.getElementById('webhookStatusDot');
 
     const stopHeaderTitleEl = document.getElementById('stopHeaderTitle');
     const stopCarListEl = document.getElementById('stopCarList');
@@ -1021,60 +993,68 @@
     });
 
     // =============================================================
-    // CONFIGURACIÓN - Mostrar/Guardar
+    // WEBHOOK - CONFIGURACIÓN Y ENVÍO MEJORADO
     // =============================================================
-    function abrirConfiguracion() {
-        configWebhook.value = WEBHOOK_URL;
-        configNtfyTopic.value = NTFY_TOPIC;
-        configOverlay.classList.add('active');
+    function loadWebhookUrl() {
+        webhookUrlInput.value = WEBHOOK_URL;
+        actualizarEstadoWebhook();
     }
 
-    function cerrarConfiguracion() {
-        configOverlay.classList.remove('active');
+    function actualizarEstadoWebhook() {
+        // Solo visual, se pondrá ok/error al probar
     }
 
-    headerFilter.addEventListener('click', abrirConfiguracion);
-    configClose.addEventListener('click', cerrarConfiguracion);
+    function setWebhookStatus(ok) {
+        webhookStatusDot.className = 'status-dot ' + (ok ? 'ok' : 'error');
+    }
 
-    configSave.addEventListener('click', () => {
-        const newWebhook = configWebhook.value.trim();
-        const newTopic = configNtfyTopic.value.trim();
-        if (!newWebhook || !newTopic) {
-            setToast('❌ Ambos campos son obligatorios', 'error');
-            return;
+    btnSaveWebhook.addEventListener('click', () => {
+        const url = webhookUrlInput.value.trim();
+        if (url) {
+            WEBHOOK_URL = url;
+            localStorage.setItem('smarttd_webhook_url', url);
+            setToast('✅ URL del webhook guardada', 'success');
+            setWebhookStatus(true);
+        } else {
+            setToast('❌ URL vacía', 'error');
         }
-        // Guardar en localStorage
-        localStorage.setItem('smarttd_webhook_url', newWebhook);
-        localStorage.setItem('smarttd_ntfy_topic', newTopic);
-        // Actualizar variables globales
-        WEBHOOK_URL = newWebhook;
-        NTFY_TOPIC = newTopic;
-        // Reconectar ntfy con el nuevo topic
-        reconectarNtfy();
-        cerrarConfiguracion();
-        setToast('✅ Configuración guardada y reconectando...', 'success');
-        console.log('[CONFIG] Nuevo webhook:', WEBHOOK_URL);
-        console.log('[CONFIG] Nuevo topic:', NTFY_TOPIC);
     });
 
-    // Si no hay configuración guardada, mostrar el modal al inicio
-    function mostrarConfigSiNoExiste() {
-        const webhookSaved = localStorage.getItem('smarttd_webhook_url');
-        const topicSaved = localStorage.getItem('smarttd_ntfy_topic');
-        if (!webhookSaved || !topicSaved) {
-            abrirConfiguracion();
+    btnTestWebhook.addEventListener('click', async () => {
+        const url = webhookUrlInput.value.trim() || WEBHOOK_URL;
+        if (!url) {
+            setToast('❌ No hay URL de webhook', 'error');
+            return;
         }
-    }
+        setToast('🔍 Probando webhook...', 'info');
+        try {
+            const response = await fetch(url + '?cmd=ping', {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (response.ok) {
+                setToast('✅ Webhook respondió correctamente', 'success');
+                setWebhookStatus(true);
+            } else {
+                setToast('⚠️ Webhook respondió con código ' + response.status, 'warning');
+                setWebhookStatus(false);
+            }
+        } catch (e) {
+            setToast('❌ Error al probar webhook: ' + e.message, 'error');
+            setWebhookStatus(false);
+        }
+    });
 
-    // =============================================================
-    // ENVÍO DE COMANDOS (usa WEBHOOK_URL)
-    // =============================================================
+    // Envío de comandos con manejo robusto
     function sendCommand(cmd) {
         if (!cmd) return;
         const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
         setToast(`📤 Enviando "${cmd}"...`, 'info');
         console.log('[COMANDO] Enviando:', cmd, 'a', url);
 
+        // Usamos fetch con timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -1089,8 +1069,10 @@
             clearTimeout(timeoutId);
             if (response.ok) {
                 setToast(`✅ Comando "${cmd}" enviado (${response.status})`, 'success');
+                setWebhookStatus(true);
             } else {
                 setToast(`⚠️ Comando enviado pero respuesta ${response.status}`, 'warning');
+                setWebhookStatus(false);
             }
         })
         .catch(err => {
@@ -1100,6 +1082,7 @@
             } else {
                 setToast(`❌ Error: ${err.message}`, 'error');
             }
+            setWebhookStatus(false);
             console.error('[COMANDO] Error:', err);
         });
     }
@@ -1112,74 +1095,6 @@
             sendCommand(cmd);
         });
     });
-
-    // =============================================================
-    // CONEXIÓN NTFY (usa NTFY_SSE_URL)
-    // =============================================================
-    function connectToNtfy() {
-        setToast('🔄 Conectando a ntfy.sh...', 'info');
-        setStatus(false, 'Conectando...');
-        console.log('[NTFY] Conectando a topic:', NTFY_TOPIC);
-
-        try {
-            if (eventSource) {
-                eventSource.close();
-                eventSource = null;
-            }
-
-            const url = NTFY_SSE_URL();
-            console.log('[NTFY] SSE URL:', url);
-            eventSource = new EventSource(url);
-
-            eventSource.onopen = function() {
-                setToast('✅ Conectado, esperando datos...', 'success');
-                setStatus(true, 'Conectado');
-                lastMessageTime = Date.now();
-                console.log('[NTFY] Conexión SSE establecida');
-            };
-
-            eventSource.onmessage = function(event) {
-                const raw = event.data;
-                if (raw === 'ping' || raw === 'keepalive') return;
-                lastMessageTime = Date.now();
-                setStatus(true, 'Conectado');
-                console.log('[NTFY] Mensaje recibido:', raw);
-                processIncomingMessage(raw);
-            };
-
-            eventSource.onerror = function() {
-                setStatus(false, 'NO CONECTADO');
-                setToast('⚠️ Error en conexión ntfy', 'error');
-                console.error('[NTFY] Error en conexión SSE');
-                setTimeout(() => {
-                    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
-                        connectToNtfy();
-                    }
-                }, 10000);
-            };
-
-            setInterval(() => {
-                if (connected && Date.now() - lastMessageTime > 15000) {
-                    setStatus(false, 'NO CONECTADO');
-                    setToast('⏳ Sin datos desde hace 15s', 'warning');
-                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
-                }
-            }, 5000);
-
-        } catch (e) {
-            setToast('❌ Error al conectar: ' + e.message, 'error');
-            setStatus(false, 'NO CONECTADO');
-            console.error('[NTFY] Error al conectar:', e);
-        }
-    }
-
-    function reconectarNtfy() {
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-        }
-        connectToNtfy();
-    }
 
     // =============================================================
     // GEOLOCALIZACIÓN Y GEOCODIFICACIÓN MEJORADA
@@ -1730,7 +1645,7 @@
     }
 
     // =============================================================
-    // PARSERS
+    // PARSERS (completos)
     // =============================================================
     function parseDetalleServicios(data) {
         if (!data || typeof data !== 'object') return null;
@@ -2361,6 +2276,64 @@
     }
 
     // =============================================================
+    // CONEXIÓN NTFY
+    // =============================================================
+    function connectToNtfy() {
+        setToast('🔄 Conectando a ntfy.sh...', 'info');
+        setStatus(false, 'Conectando...');
+        console.log('[NTFY] Conectando...');
+
+        try {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            eventSource = new EventSource(NTFY_SSE_URL);
+
+            eventSource.onopen = function() {
+                setToast('✅ Conectado, esperando datos...', 'success');
+                setStatus(true, 'Conectado');
+                lastMessageTime = Date.now();
+                console.log('[NTFY] Conexión SSE establecida');
+            };
+
+            eventSource.onmessage = function(event) {
+                const raw = event.data;
+                if (raw === 'ping' || raw === 'keepalive') return;
+                lastMessageTime = Date.now();
+                setStatus(true, 'Conectado');
+                console.log('[NTFY] Mensaje recibido:', raw);
+                processIncomingMessage(raw);
+            };
+
+            eventSource.onerror = function() {
+                setStatus(false, 'NO CONECTADO');
+                setToast('⚠️ Error en conexión ntfy', 'error');
+                console.error('[NTFY] Error en conexión SSE');
+                setTimeout(() => {
+                    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+                        connectToNtfy();
+                    }
+                }, 10000);
+            };
+
+            setInterval(() => {
+                if (connected && Date.now() - lastMessageTime > 15000) {
+                    setStatus(false, 'NO CONECTADO');
+                    setToast('⏳ Sin datos desde hace 15s', 'warning');
+                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
+                }
+            }, 5000);
+
+        } catch (e) {
+            setToast('❌ Error al conectar: ' + e.message, 'error');
+            setStatus(false, 'NO CONECTADO');
+            console.error('[NTFY] Error al conectar:', e);
+        }
+    }
+
+    // =============================================================
     // PRUEBAS MANUALES
     // =============================================================
     document.getElementById('btnTestOferta').addEventListener('click', () => {
@@ -2512,17 +2485,15 @@
     // =============================================================
     // INICIALIZACIÓN
     // =============================================================
+    loadWebhookUrl();
     renderMonitor({ tableData: [] });
     updateTimestamp();
-    // Mostrar configuración si no existe
-    mostrarConfigSiNoExiste();
     connectToNtfy();
     setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
 
     console.log('✅ Aplicación iniciada correctamente');
     console.log('📡 Webhook URL:', WEBHOOK_URL);
-    console.log('📡 Ntfy topic:', NTFY_TOPIC);
     </script>
 </body>
     </html>
