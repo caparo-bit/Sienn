@@ -478,27 +478,10 @@
             margin: 6px 0 16px;
             color: #d6e6f5;
             max-height: 70vh;
-        }
-        .modal-box .modal-content .despacho-hora {
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: #f4c542;
-            margin-bottom: 12px;
-        }
-        .modal-box .modal-content .despacho-dir {
-            font-size: 1.05rem;
-            line-height: 1.5;
-            color: #d6e6f5;
-            margin-bottom: 18px;
+            white-space: pre-wrap;
             word-break: break-word;
-        }
-        .modal-box .modal-content .despacho-pregunta {
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-align: center;
-            color: #ffffff;
-            padding-top: 12px;
-            border-top: 1px solid #1e3a5a;
+            font-size: 0.95rem;
+            line-height: 1.6;
         }
         .modal-box .modal-buttons {
             display: flex;
@@ -1070,6 +1053,53 @@
     }
 
     // -------------------------------------------------------------
+    // [NUEVO] FUNCIONES DE DETECCIÓN DE DESPACHO (copiadas de la versión simple)
+    // -------------------------------------------------------------
+    function contieneDespacho(valor) {
+        if (typeof valor === 'string') {
+            return valor.includes('Tiene Despacho');
+        }
+        if (Array.isArray(valor)) {
+            return valor.some(item => contieneDespacho(item));
+        }
+        if (valor && typeof valor === 'object') {
+            for (const key in valor) {
+                if (contieneDespacho(valor[key])) return true;
+            }
+        }
+        return false;
+    }
+
+    function extraerTextoDespacho(valor, acumulado = '') {
+        if (typeof valor === 'string') {
+            if (valor.includes('Tiene Despacho')) {
+                return acumulado + (acumulado ? '\n' : '') + valor;
+            }
+            return acumulado;
+        }
+        if (Array.isArray(valor)) {
+            let result = acumulado;
+            for (const item of valor) {
+                result = extraerTextoDespacho(item, result);
+            }
+            return result;
+        }
+        if (valor && typeof valor === 'object') {
+            let result = acumulado;
+            for (const key in valor) {
+                if (key.toLowerCase() === 'distancia' || key.toLowerCase() === 'message') {
+                    const sub = extraerTextoDespacho(valor[key], '');
+                    if (sub) result += (result ? '\n' : '') + sub;
+                } else {
+                    result = extraerTextoDespacho(valor[key], result);
+                }
+            }
+            return result;
+        }
+        return acumulado;
+    }
+
+    // -------------------------------------------------------------
     // PARSERS INDEPENDIENTES
     // -------------------------------------------------------------
 
@@ -1223,7 +1253,7 @@
     }
 
     /**
-     * Parser para el Estado 2: Oferta de Despacho
+     * Parser para el Estado 2: Oferta de Despacho (estructura exacta)
      */
     function parseOferta(data) {
         if (!data || typeof data !== 'object') return null;
@@ -1378,19 +1408,17 @@
     }
 
     /**
-     * Renderiza Estado 2: Modal de Oferta de Despacho
+     * Renderiza Estado 2: Modal de Oferta de Despacho (estructura formateada)
      */
     function renderOferta(ofertaData) {
         modalContent.innerHTML = `
-            <div class="despacho-hora">${escapeHtml(ofertaData.hora)}</div>
-
-            <div class="despacho-dir">
+            <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(ofertaData.hora)}</div>
+            <div style="margin-bottom:12px; line-height:1.5;">
                 ${escapeHtml(ofertaData.direccion)}<br>
                 ${escapeHtml(ofertaData.ciudad)}<br>
-                Zona: <b>${escapeHtml(ofertaData.zona)}</b>
+                <b>Zona:</b> ${escapeHtml(ofertaData.zona)}
             </div>
-
-            <div class="despacho-pregunta">
+            <div style="border-top:1px solid #1e3a5a; padding-top:12px; font-weight:700; text-align:center; color:#fff;">
                 ${escapeHtml(ofertaData.pregunta)}
             </div>
         `;
@@ -1402,6 +1430,16 @@
         lanzarNotificacionNativa(
             ofertaData.direccion + " - " + ofertaData.ciudad
         );
+    }
+
+    /**
+     * Renderiza el modal de despacho con texto plano (fallback)
+     */
+    function renderDespachoSimple(texto) {
+        modalContent.textContent = texto;
+        setViewState(STATE_OFERTA);
+        iniciarAlertaDespacho();
+        lanzarNotificacionNativa(texto.substring(0, 100) + '...');
     }
 
     function ocultarModal() {
@@ -1442,13 +1480,23 @@
     // PROCESADOR GENERAL DE MENSAJES (DISPATCHER DE ESTADOS)
     // -------------------------------------------------------------
     function processIncomingMessage(rawPayload) {
+        // Intentar parsear como JSON si es string
         let jsonPayload = null;
+        let esStringPlano = false;
 
         if (typeof rawPayload === 'string') {
-            try {
-                jsonPayload = JSON.parse(rawPayload);
-            } catch (_) {
-                jsonPayload = rawPayload;
+            const trimmed = rawPayload.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                try {
+                    jsonPayload = JSON.parse(trimmed);
+                } catch (_) {
+                    // No es JSON, lo tratamos como string plano
+                    jsonPayload = trimmed;
+                    esStringPlano = true;
+                }
+            } else {
+                jsonPayload = trimmed;
+                esStringPlano = true;
             }
         } else {
             jsonPayload = rawPayload;
@@ -1457,24 +1505,60 @@
         // Si el payload viene envuelto por ntfy en .message
         if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
             if (typeof jsonPayload.message === 'string') {
-                try {
-                    jsonPayload = JSON.parse(jsonPayload.message);
-                } catch (_) {
-                    jsonPayload = jsonPayload.message;
+                const trimmedMsg = jsonPayload.message.trim();
+                if (trimmedMsg.startsWith('{') || trimmedMsg.startsWith('[')) {
+                    try {
+                        jsonPayload = JSON.parse(trimmedMsg);
+                    } catch (_) {
+                        jsonPayload = trimmedMsg;
+                        esStringPlano = true;
+                    }
+                } else {
+                    jsonPayload = trimmedMsg;
+                    esStringPlano = true;
                 }
             } else {
                 jsonPayload = jsonPayload.message;
             }
         }
 
-        // Evaluamos en orden de prioridad de la máquina de estados
-        
-        // 1. ¿Es una Oferta de Despacho?
-        const ofertaParsed = parseOferta(jsonPayload);
-        if (ofertaParsed) {
-            renderOferta(ofertaParsed);
-            return;
+        // -------------------------------------------------------------
+        // PASO 1: DETECCIÓN DE DESPACHO (copiado de la versión simple)
+        // Se ejecuta ANTES de cualquier otro parseo.
+        // -------------------------------------------------------------
+        let esDespacho = false;
+        let textoDespacho = '';
+
+        if (typeof jsonPayload === 'string') {
+            if (jsonPayload.includes('Tiene Despacho')) {
+                esDespacho = true;
+                textoDespacho = jsonPayload;
+            }
+        } else if (jsonPayload && typeof jsonPayload === 'object') {
+            esDespacho = contieneDespacho(jsonPayload);
+            if (esDespacho) {
+                textoDespacho = extraerTextoDespacho(jsonPayload);
+                if (!textoDespacho) {
+                    textoDespacho = JSON.stringify(jsonPayload, null, 2);
+                }
+            }
         }
+
+        if (esDespacho) {
+            // Intentar parsear como oferta estructurada para mostrar bonito
+            const ofertaParsed = parseOferta(jsonPayload);
+            if (ofertaParsed) {
+                renderOferta(ofertaParsed);
+            } else {
+                renderDespachoSimple(textoDespacho);
+            }
+            setToast('📨 ¡Nuevo despacho!', 'warning');
+            return; // IMPORTANTE: salir, no procesar como otros estados
+        }
+
+        // -------------------------------------------------------------
+        // PASO 2: Si no es despacho, procesar el resto de estados
+        // -------------------------------------------------------------
 
         // 2. ¿Es un Servicio Aceptado/Asignado?
         const servicioParsed = parseServicio(jsonPayload);
@@ -1506,6 +1590,11 @@
             updateTimestamp();
             setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
             return;
+        }
+
+        // Si no se reconoció, mostrar un toast informativo
+        if (jsonPayload && typeof jsonPayload === 'object') {
+            setToast('⚠️ Datos no reconocidos', 'warning');
         }
     }
 
@@ -1646,19 +1735,20 @@
         });
     });
 
-    // Triple click en título para disparar prueba de despacho rápida
+    // Triple click en título para disparar prueba de despacho rápida (estilo simple)
     let titleClicks = 0;
     zoneTitleEl.addEventListener('click', function() {
         titleClicks++;
         if (titleClicks >= 3) {
             titleClicks = 0;
-            processIncomingMessage({
-                txInfoAction: "Tiene Despacho",
-                txHour: "10:20",
-                txSimpleAdress: "Avenida del Ensanche de Vallecas, 102",
-                txCity: "Madrid",
-                txPickUpZone: "ENSANCHE VALL"
-            });
+            const testMsg = `[0]: 17:55
+[1]: 17:53 ASAMBLEA
+[2]: Calle de Fantasía / Calle de La
+[3]: Cenicienta,
+[4]: Madrid-Madrid
+[5]: Ol (21
+[6]: Tiene Despacho`;
+            processIncomingMessage(testMsg);
         }
     });
 
