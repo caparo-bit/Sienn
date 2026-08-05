@@ -810,6 +810,7 @@
     let routeGeometry = null;
     let mapInstance = null;
     let mapInitialized = false;
+    let tileLayer = null; // guardar la capa base
 
     // =============================================================
     // MÁQUINA DE ESTADOS
@@ -851,15 +852,19 @@
             console.log('[MAP] Abriendo vista mapa...');
             ocultarModal();
             viewMapa.classList.add('active');
+            // Inicializar el mapa solo si no está inicializado, pero siempre redimensionar
             if (!mapInitialized) {
                 console.log('[MAP] Inicializando por primera vez...');
                 initMap();
             }
+            // Forzar redimensionamiento después de que la vista esté visible
             setTimeout(() => {
-                console.log('[MAP] Ejecutando actualizarMapa() después de 300ms...');
-                if (mapInstance) mapInstance.invalidateSize();
-                actualizarMapa();
-            }, 300);
+                console.log('[MAP] Redimensionando mapa...');
+                if (mapInstance) {
+                    mapInstance.invalidateSize();
+                    actualizarMapa();
+                }
+            }, 500);
         }
     }
 
@@ -990,11 +995,12 @@
     }
 
     // =============================================================
-    // MAPA
+    // MAPA (CORREGIDO)
     // =============================================================
     function initMap() {
         if (mapInitialized) {
-            console.log('[MAP] Ya estaba inicializado');
+            console.log('[MAP] Ya estaba inicializado, solo redimensionando');
+            if (mapInstance) mapInstance.invalidateSize();
             return;
         }
         const mapContainer = document.getElementById('map');
@@ -1013,7 +1019,8 @@
                 attributionControl: true
             }).setView([40.4168, -3.7038], 13);
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            // Guardar la capa base para no eliminarla al limpiar
+            tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapInstance);
 
@@ -1022,7 +1029,7 @@
             setTimeout(() => {
                 if (mapInstance) {
                     mapInstance.invalidateSize();
-                    console.log('[MAP] invalidateSize() ejecutado');
+                    console.log('[MAP] invalidateSize() ejecutado en initMap');
                 }
             }, 500);
         } catch (e) {
@@ -1032,19 +1039,23 @@
 
     function actualizarMapa() {
         if (!mapInstance || !mapInitialized) {
-            console.warn('[MAP] No se puede actualizar, mapa no inicializado');
+            console.warn('[MAP] Mapa no inicializado, intentando initMap()...');
             initMap();
             if (!mapInstance) return;
         }
 
         console.log('[MAP] Actualizando mapa...');
+        console.log('[MAP] Despacho coords:', despachoLat, despachoLon);
+        console.log('[MAP] Usuario coords:', userLat, userLon);
 
+        // Limpiar capas anteriores excepto la capa base (tileLayer)
         mapInstance.eachLayer((layer) => {
-            if (layer instanceof L.Marker || layer instanceof L.Polyline || layer instanceof L.Polygon || layer instanceof L.LayerGroup) {
+            if (layer !== tileLayer) {
                 mapInstance.removeLayer(layer);
             }
         });
 
+        // Si no hay destino, mostrar mensaje
         if (!despachoLat || !despachoLon) {
             console.warn('[MAP] No hay coordenadas de despacho, mostrando mensaje');
             const msg = L.divIcon({
@@ -1059,33 +1070,27 @@
             return;
         }
 
-        console.log('[MAP] Coordenadas de despacho:', despachoLat, despachoLon);
-        console.log('[MAP] Dirección:', despachoDireccion);
-
-        if (!userLat || !userLon) {
-            console.warn('[MAP] Sin ubicación de usuario, mostrando solo destino');
-            L.marker([despachoLat, despachoLon], {
-                icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
-            }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
-            mapInstance.setView([despachoLat, despachoLon], 15);
-            mapInstance.invalidateSize();
-            return;
-        }
-
-        L.marker([userLat, userLon], {
-            icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
-        }).addTo(mapInstance).bindPopup('📍 Tu ubicación');
-
+        // Marcador de destino
         L.marker([despachoLat, despachoLon], {
             icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
         }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
 
-        if (routeGeometry && routeGeometry.length > 1) {
+        // Marcador de usuario (si existe)
+        if (userLat && userLon) {
+            L.marker([userLat, userLon], {
+                icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
+            }).addTo(mapInstance).bindPopup('📍 Tu ubicación');
+        } else {
+            console.warn('[MAP] Sin ubicación de usuario');
+        }
+
+        // Dibujar ruta
+        if (routeGeometry && routeGeometry.length > 1 && userLat && userLon) {
             console.log('[MAP] Dibujando ruta con', routeGeometry.length, 'puntos');
             L.polyline(routeGeometry, { color: '#4fa8ff', weight: 5, opacity: 0.8 })
                 .addTo(mapInstance)
                 .bindPopup(`🚗 ${formatearDistancia(despachoDistancia)} · ${formatearTiempo(despachoTiempo)}`);
-        } else {
+        } else if (userLat && userLon) {
             console.log('[MAP] Sin geometría de ruta, usando línea recta');
             L.polyline([[userLat, userLon], [despachoLat, despachoLon]], {
                 color: '#ff4444',
@@ -1095,10 +1100,11 @@
             }).addTo(mapInstance).bindPopup('⚠️ Distancia en línea recta (sin ruta)');
         }
 
-        const bounds = L.latLngBounds([
-            [userLat, userLon],
-            [despachoLat, despachoLon]
-        ]);
+        // Ajustar vista para abarcar todos los puntos
+        const bounds = L.latLngBounds([ [despachoLat, despachoLon] ]);
+        if (userLat && userLon) {
+            bounds.extend([userLat, userLon]);
+        }
         if (routeGeometry && routeGeometry.length > 1) {
             const routeBounds = L.latLngBounds(routeGeometry);
             bounds.extend(routeBounds);
