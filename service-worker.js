@@ -3,7 +3,7 @@
 // Funciona en segundo plano y con el móvil bloqueado
 // ============================================================
 
-const CACHE_NAME = 'smarttd-v3';
+const CACHE_NAME = 'smarttd-monitor';
 const WEBHOOK_URL = 'https://trigger.macrodroid.com/7b060a53-60fe-4b1b-b375-27756941187a/smarttd-remote'; // ¡UNIFICA esta URL con la del HTML!
 
 // ============================================================
