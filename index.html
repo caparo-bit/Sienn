@@ -77,6 +77,7 @@
             cursor: pointer; 
         }
         .header .filter { font-size: 1.1rem; color: #eafff0; width: 28px; text-align: right; cursor: pointer; }
+        .header .debug-toggle { font-size: 1.3rem; color: #eafff0; margin-left: 8px; cursor: pointer; user-select: none; }
         .header-strip { 
             height: 3px; 
             background: linear-gradient(90deg, var(--accent-gold), var(--accent-gold) 60%, transparent 60%); 
@@ -498,7 +499,6 @@
         .modal-box .modal-buttons .btn-accept { background: #0f7b3a; color: #e0f2e0; }
         .modal-box .modal-buttons .btn-reject { background: #7b1f1f; color: #fcd0d0; }
         .modal-box .modal-buttons .btn-map { background: #1e3a5a; color: #4fa8ff; flex: 0.7; }
-        .modal-box .modal-buttons .btn-correct { background: #b45309; color: #fff3e0; flex: 0.7; }
 
         #viewMapa {
             height: 80vh;
@@ -561,79 +561,50 @@
             font-weight: 600;
         }
 
-        /* Corrección de dirección en el modal */
-        .direccion-edit-area {
-            margin-top: 12px;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .direccion-edit-area input {
-            flex: 1;
-            padding: 8px 12px;
-            border-radius: 30px;
-            border: 1px solid #1e3a5a;
-            background: #0a1628;
-            color: #fff;
-            font-size: 0.9rem;
-            outline: none;
-            min-width: 150px;
-        }
-        .direccion-edit-area input::placeholder {
-            color: #5c7ea0;
-        }
-        .direccion-edit-area button {
-            background: #4fa8ff;
-            border: none;
-            border-radius: 30px;
-            padding: 8px 16px;
-            color: #fff;
-            font-weight: 700;
-            font-size: 0.8rem;
-            cursor: pointer;
-        }
-
-        /* Configuración webhook */
-        .webhook-config {
-            margin: 8px 14px 0;
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-            align-items: center;
-            background: #0a1628;
-            padding: 6px 10px;
-            border-radius: 30px;
-            border: 1px solid #1e3a5a;
-        }
-        .webhook-config input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #b3d9ff;
+        /* CONSOLA DE DEPURACIÓN */
+        #debugConsole {
+            background: #0a0a0a;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
             font-size: 0.7rem;
-            padding: 4px 6px;
-            outline: none;
-            min-width: 120px;
+            padding: 8px 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            border-top: 1px solid #1e3a5a;
+            margin-top: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.4;
+            scroll-behavior: smooth;
         }
-        .webhook-config button {
-            background: #1e3a5a;
+        #debugConsole .log-line {
+            border-bottom: 1px solid #1a1a1a;
+            padding: 2px 0;
+        }
+        #debugConsole .log-time { color: #888; }
+        #debugConsole .log-level-INFO { color: #4fa8ff; }
+        #debugConsole .log-level-WARN { color: #f4c542; }
+        #debugConsole .log-level-ERROR { color: #f45c5c; }
+        #debugConsole .log-level-DATA { color: #22c55e; }
+        #debugConsole .log-level-DEBUG { color: #b58c8a; }
+
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            color: #aaa;
+            font-size: 0.7rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+        .debug-header button {
+            background: none;
             border: none;
-            border-radius: 20px;
-            color: #b3d9ff;
-            font-size: 0.6rem;
-            padding: 4px 12px;
+            color: #aaa;
             cursor: pointer;
-            font-weight: 600;
+            font-size: 0.7rem;
         }
-        .webhook-config .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .webhook-config .status-dot.ok { background: var(--accent-green); }
-        .webhook-config .status-dot.error { background: var(--accent-red); }
-        .webhook-config .status-dot.unknown { background: #5c7ea0; }
+        .debug-header button:hover { color: #fff; }
 
         @media (max-width:420px) { 
             .btn-grid .btn { font-size: 0.62rem; padding: 10px 0; } 
@@ -644,6 +615,7 @@
             .modal-box { padding: 16px 14px; }
             .modal-box .modal-buttons button { font-size: 0.9rem; padding: 14px 8px; }
             #viewMapa { height: 75vh; }
+            #debugConsole { font-size: 0.6rem; max-height: 150px; }
         }
         @media (min-width:600px) {
             .modal-box { max-width: 550px; padding: 30px 28px 24px; }
@@ -656,7 +628,10 @@
         <div class="header">
             <div class="back" id="headerBack">‹</div>
             <div class="title" id="zoneTitle">Z: CARGANDO...</div>
-            <div class="filter" id="headerFilter">⏷</div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <span class="debug-toggle" id="toggleDebugConsole" title="Consola de depuración">📋</span>
+                <span class="filter" id="headerFilter">⏷</span>
+            </div>
         </div>
         <div class="header-strip"></div>
         <div class="subbar">
@@ -718,15 +693,6 @@
                     <div class="libre-btn" data-cmd="libre" id="libreBtn">LIBRE</div>
                 </div>
 
-                <!-- Configuración del webhook -->
-                <div class="webhook-config">
-                    <span style="font-size:0.6rem;color:#5c7ea0;">🔗</span>
-                    <input type="text" id="webhookUrlInput" placeholder="URL del webhook" />
-                    <button id="btnTestWebhook">🔍 Probar</button>
-                    <button id="btnSaveWebhook">💾 Guardar</button>
-                    <span class="status-dot unknown" id="webhookStatusDot"></span>
-                </div>
-
                 <div class="demo-bar">
                     <span>Simulación:</span>
                     <button id="btnTestOferta">⚡ Oferta</button>
@@ -735,7 +701,6 @@
                     <button id="btnTestRuta">🕒 Ruta T4</button>
                     <button id="btnTestMonitor">📊 Monitor</button>
                     <button id="btnTestDespachoReal">📍 Despacho prueba</button>
-                    <button id="btnTestServicioReal">🚕 Servicio prueba</button>
                 </div>
             </div>
         </div>
@@ -815,18 +780,22 @@
         <!-- TOAST -->
         <div class="toast" id="toast">💡 Esperando datos...</div>
 
+        <!-- CONSOLA DE DEPURACIÓN -->
+        <div id="debugConsole" style="display:none;">
+            <div class="debug-header">
+                <span>🔍 Consola de depuración</span>
+                <button id="clearDebugConsole">🗑️ Limpiar</button>
+            </div>
+            <div id="debugConsoleContent"></div>
+        </div>
+
         <!-- MODAL -->
         <div class="modal-overlay" id="modalOverlay">
             <div class="modal-box">
                 <div class="modal-title"><span>📨 DESPACHO</span></div>
                 <div class="modal-content" id="modalContent"></div>
-                <div class="direccion-edit-area" id="direccionEditArea" style="display:none;">
-                    <input type="text" id="inputDireccionCorregida" placeholder="Escribe la dirección corregida..." />
-                    <button id="btnAplicarCorreccion">✅ Aplicar</button>
-                </div>
                 <div class="modal-buttons">
                     <button class="btn-map" id="modalMap">🗺️ Mapa</button>
-                    <button class="btn-correct" id="modalCorregir">📍 Corregir dirección</button>
                     <button class="btn-reject" id="modalReject">❌ CANCELAR</button>
                     <button class="btn-accept" id="modalAccept">✅ ACEPTAR</button>
                 </div>
@@ -840,9 +809,75 @@
     // =============================================================
     // CONFIGURACIÓN
     // =============================================================
-    let WEBHOOK_URL = localStorage.getItem('smarttd_webhook_url') || 'https://trigger.macrodroid.com/30c83d0a-a2d0-404b-9f16-48ed24896d46/smarttd-remote';
+    const WEBHOOK_URL = 'https://trigger.macrodroid.com/7b060a53-60fe-4b1b-b375-27756941187a/smarttd-remote';
     const NTFY_TOPIC = 'smarttd-monitor';
     const NTFY_SSE_URL = `https://ntfy.sh/${NTFY_TOPIC}/sse`;
+
+    // =============================================================
+    // CONSOLA DE DEPURACIÓN VISUAL
+    // =============================================================
+    const debugConsoleEl = document.getElementById('debugConsole');
+    const debugContentEl = document.getElementById('debugConsoleContent');
+    const toggleDebugBtn = document.getElementById('toggleDebugConsole');
+    const clearDebugBtn = document.getElementById('clearDebugConsole');
+    let debugVisible = false;
+    const MAX_LOG_LINES = 500;
+
+    function logToConsole(level, message, data) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('es-ES', { hour12: false });
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        const levelClass = 'log-level-' + level.toUpperCase();
+        let content = `<span class="log-time">[${timeStr}]</span> <span class="${levelClass}">${level.toUpperCase()}</span> ${escapeHtml(message)}`;
+        if (data !== undefined && data !== null) {
+            let dataStr = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+            content += `\n${escapeHtml(dataStr)}`;
+        }
+        line.innerHTML = content.replace(/\n/g, '<br>');
+        debugContentEl.appendChild(line);
+        // Mantener límite de líneas
+        while (debugContentEl.children.length > MAX_LOG_LINES) {
+            debugContentEl.removeChild(debugContentEl.firstChild);
+        }
+        // Auto-scroll al final
+        debugConsoleEl.scrollTop = debugConsoleEl.scrollHeight;
+    }
+
+    // Interceptar console.log/warn/error para redirigir a la consola visual
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = function(...args) {
+        originalLog.apply(console, args);
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        logToConsole('info', msg);
+    };
+    console.warn = function(...args) {
+        originalWarn.apply(console, args);
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        logToConsole('warn', msg);
+    };
+    console.error = function(...args) {
+        originalError.apply(console, args);
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        logToConsole('error', msg);
+    };
+
+    // Toggle consola
+    toggleDebugBtn.addEventListener('click', () => {
+        debugVisible = !debugVisible;
+        debugConsoleEl.style.display = debugVisible ? 'block' : 'none';
+        if (debugVisible) {
+            debugConsoleEl.scrollTop = debugConsoleEl.scrollHeight;
+        }
+    });
+
+    clearDebugBtn.addEventListener('click', () => {
+        debugContentEl.innerHTML = '';
+        logToConsole('info', 'Consola limpiada');
+    });
 
     // =============================================================
     // REFERENCIAS DOM
@@ -869,15 +904,6 @@
     const modalAccept = document.getElementById('modalAccept');
     const modalReject = document.getElementById('modalReject');
     const modalMap = document.getElementById('modalMap');
-    const modalCorregir = document.getElementById('modalCorregir');
-    const direccionEditArea = document.getElementById('direccionEditArea');
-    const inputDireccionCorregida = document.getElementById('inputDireccionCorregida');
-    const btnAplicarCorreccion = document.getElementById('btnAplicarCorreccion');
-
-    const webhookUrlInput = document.getElementById('webhookUrlInput');
-    const btnTestWebhook = document.getElementById('btnTestWebhook');
-    const btnSaveWebhook = document.getElementById('btnSaveWebhook');
-    const webhookStatusDot = document.getElementById('webhookStatusDot');
 
     const stopHeaderTitleEl = document.getElementById('stopHeaderTitle');
     const stopCarListEl = document.getElementById('stopCarList');
@@ -908,14 +934,6 @@
     let routeGeometry = null;
     let mapInstance = null;
     let mapInitialized = false;
-    let tileLayer = null;
-
-    // Variables para corrección de dirección
-    let currentDireccionOriginal = '';
-    let currentCiudadOriginal = '';
-    let currentZonaOriginal = '';
-    let currentHoraOriginal = '';
-    let currentPreguntaOriginal = '';
 
     // =============================================================
     // MÁQUINA DE ESTADOS
@@ -962,12 +980,10 @@
                 initMap();
             }
             setTimeout(() => {
-                console.log('[MAP] Redimensionando mapa...');
-                if (mapInstance) {
-                    mapInstance.invalidateSize();
-                    actualizarMapa();
-                }
-            }, 500);
+                console.log('[MAP] Ejecutando actualizarMapa() después de 300ms...');
+                if (mapInstance) mapInstance.invalidateSize();
+                actualizarMapa();
+            }, 300);
         }
     }
 
@@ -993,192 +1009,8 @@
     });
 
     // =============================================================
-    // WEBHOOK - CONFIGURACIÓN Y ENVÍO MEJORADO
+    // GEOLOCALIZACIÓN, GEOCODIFICACIÓN Y RUTAS
     // =============================================================
-    function loadWebhookUrl() {
-        webhookUrlInput.value = WEBHOOK_URL;
-        actualizarEstadoWebhook();
-    }
-
-    function actualizarEstadoWebhook() {
-        // Solo visual, se pondrá ok/error al probar
-    }
-
-    function setWebhookStatus(ok) {
-        webhookStatusDot.className = 'status-dot ' + (ok ? 'ok' : 'error');
-    }
-
-    btnSaveWebhook.addEventListener('click', () => {
-        const url = webhookUrlInput.value.trim();
-        if (url) {
-            WEBHOOK_URL = url;
-            localStorage.setItem('smarttd_webhook_url', url);
-            setToast('✅ URL del webhook guardada', 'success');
-            setWebhookStatus(true);
-        } else {
-            setToast('❌ URL vacía', 'error');
-        }
-    });
-
-    btnTestWebhook.addEventListener('click', async () => {
-        const url = webhookUrlInput.value.trim() || WEBHOOK_URL;
-        if (!url) {
-            setToast('❌ No hay URL de webhook', 'error');
-            return;
-        }
-        setToast('🔍 Probando webhook...', 'info');
-        try {
-            const response = await fetch(url + '?cmd=ping', {
-                method: 'GET',
-                mode: 'cors',
-                cache: 'no-cache',
-                headers: { 'Accept': 'application/json' }
-            });
-            if (response.ok) {
-                setToast('✅ Webhook respondió correctamente', 'success');
-                setWebhookStatus(true);
-            } else {
-                setToast('⚠️ Webhook respondió con código ' + response.status, 'warning');
-                setWebhookStatus(false);
-            }
-        } catch (e) {
-            setToast('❌ Error al probar webhook: ' + e.message, 'error');
-            setWebhookStatus(false);
-        }
-    });
-
-    // Envío de comandos con manejo robusto
-    function sendCommand(cmd) {
-        if (!cmd) return;
-        const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
-        setToast(`📤 Enviando "${cmd}"...`, 'info');
-        console.log('[COMANDO] Enviando:', cmd, 'a', url);
-
-        // Usamos fetch con timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-        fetch(url, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache',
-            signal: controller.signal,
-            headers: { 'Accept': 'application/json' }
-        })
-        .then(response => {
-            clearTimeout(timeoutId);
-            if (response.ok) {
-                setToast(`✅ Comando "${cmd}" enviado (${response.status})`, 'success');
-                setWebhookStatus(true);
-            } else {
-                setToast(`⚠️ Comando enviado pero respuesta ${response.status}`, 'warning');
-                setWebhookStatus(false);
-            }
-        })
-        .catch(err => {
-            clearTimeout(timeoutId);
-            if (err.name === 'AbortError') {
-                setToast('❌ Timeout: el webhook no responde', 'error');
-            } else {
-                setToast(`❌ Error: ${err.message}`, 'error');
-            }
-            setWebhookStatus(false);
-            console.error('[COMANDO] Error:', err);
-        });
-    }
-
-    document.querySelectorAll('[data-cmd]').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const cmd = this.getAttribute('data-cmd');
-            this.style.transform = 'scale(0.92)';
-            setTimeout(() => this.style.transform = '', 150);
-            sendCommand(cmd);
-        });
-    });
-
-    // =============================================================
-    // GEOLOCALIZACIÓN Y GEOCODIFICACIÓN MEJORADA
-    // =============================================================
-    function limpiarYExtraerDireccion(texto) {
-        if (!texto) return null;
-        let limpio = texto.replace(/\s+/g, ' ').trim();
-        const partes = limpio.split(',').map(p => p.trim());
-        let calle = partes[0] || '';
-        let ciudad = partes.length > 1 ? partes[partes.length-1] : '';
-        let numero = '';
-        const matchNum = calle.match(/(.*?)(\d+)\s*$/);
-        if (matchNum) {
-            calle = matchNum[1].trim();
-            numero = matchNum[2];
-        }
-        if (!calle && limpio) calle = limpio;
-        return { calle, numero, ciudad };
-    }
-
-    async function geocodificarDireccionInteligente(direccionCompleta, ciudad = '') {
-        if (!direccionCompleta || direccionCompleta.trim() === '') {
-            console.warn('[GEO] Dirección vacía');
-            return null;
-        }
-        setToast('🔍 Buscando ubicación...', 'info');
-        console.log('[GEO] Geocodificando:', direccionCompleta);
-
-        const query = encodeURIComponent(direccionCompleta + (ciudad ? ', ' + ciudad : '') + ', España');
-        const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=es`;
-
-        try {
-            const response = await fetch(url, {
-                headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
-            });
-            const data = await response.json();
-            if (data && data.length > 0) {
-                const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-                console.log('[GEO] Coordenadas obtenidas:', coords);
-                setToast('✅ Ubicación encontrada', 'success');
-                return coords;
-            }
-        } catch (e) {
-            console.error('[GEO] Error en geocodificación:', e);
-        }
-
-        // Fallback: solo calle y número
-        const extraida = limpiarYExtraerDireccion(direccionCompleta);
-        if (extraida && extraida.calle) {
-            const query2 = encodeURIComponent(extraida.calle + (extraida.numero ? ' ' + extraida.numero : '') + ', España');
-            try {
-                const response2 = await fetch(`https://nominatim.openstreetmap.org/search?q=${query2}&format=json&limit=1&countrycodes=es`, {
-                    headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
-                });
-                const data2 = await response2.json();
-                if (data2 && data2.length > 0) {
-                    const coords = { lat: parseFloat(data2[0].lat), lon: parseFloat(data2[0].lon) };
-                    console.log('[GEO] Coordenadas obtenidas (fallback):', coords);
-                    setToast('✅ Ubicación encontrada (fallback)', 'success');
-                    return coords;
-                }
-            } catch (e) {}
-        }
-
-        if (ciudad) {
-            const query3 = encodeURIComponent(ciudad + ', España');
-            try {
-                const response3 = await fetch(`https://nominatim.openstreetmap.org/search?q=${query3}&format=json&limit=1&countrycodes=es`, {
-                    headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
-                });
-                const data3 = await response3.json();
-                if (data3 && data3.length > 0) {
-                    const coords = { lat: parseFloat(data3[0].lat), lon: parseFloat(data3[0].lon) };
-                    console.log('[GEO] Coordenadas de ciudad (aproximadas):', coords);
-                    setToast('📍 Ubicación aproximada (ciudad)', 'warning');
-                    return coords;
-                }
-            } catch (e) {}
-        }
-
-        setToast('❌ No se pudo geolocalizar la dirección', 'error');
-        return null;
-    }
-
     function obtenerPosicionUsuario() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) {
@@ -1203,6 +1035,34 @@
         });
     }
 
+    async function geocodificarDireccion(direccion) {
+        if (!direccion || direccion.trim() === '') {
+            console.warn('[GEO] Dirección vacía');
+            return null;
+        }
+        try {
+            console.log('[GEO] Geocodificando:', direccion);
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(direccion)}&format=json&limit=1`;
+            const response = await fetch(url, {
+                headers: { 'User-Agent': 'SmartTD-Monitor/1.0' }
+            });
+            const data = await response.json();
+            if (data && data.length > 0) {
+                const coords = {
+                    lat: parseFloat(data[0].lat),
+                    lon: parseFloat(data[0].lon)
+                };
+                console.log('[GEO] Coordenadas obtenidas:', coords);
+                return coords;
+            }
+            console.warn('[GEO] No se encontraron resultados');
+            return null;
+        } catch (e) {
+            console.error('[GEO] Error:', e);
+            return null;
+        }
+    }
+
     async function obtenerRutaOSRM(originLat, originLon, destLat, destLon) {
         try {
             console.log('[OSRM] Calculando ruta de', originLat, originLon, 'a', destLat, destLon);
@@ -1215,7 +1075,11 @@
                 const tiempo = route.duration / 60;
                 const coords = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
                 console.log('[OSRM] Ruta obtenida:', distancia.toFixed(2), 'km,', tiempo.toFixed(0), 'min');
-                return { distancia_km: distancia, tiempo_min: tiempo, geometry: coords };
+                return {
+                    distancia_km: distancia,
+                    tiempo_min: tiempo,
+                    geometry: coords
+                };
             }
             console.warn('[OSRM] No se encontró ruta');
             return null;
@@ -1254,8 +1118,7 @@
     // =============================================================
     function initMap() {
         if (mapInitialized) {
-            console.log('[MAP] Ya estaba inicializado, solo redimensionando');
-            if (mapInstance) mapInstance.invalidateSize();
+            console.log('[MAP] Ya estaba inicializado');
             return;
         }
         const mapContainer = document.getElementById('map');
@@ -1274,7 +1137,7 @@
                 attributionControl: true
             }).setView([40.4168, -3.7038], 13);
 
-            tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             }).addTo(mapInstance);
 
@@ -1283,7 +1146,7 @@
             setTimeout(() => {
                 if (mapInstance) {
                     mapInstance.invalidateSize();
-                    console.log('[MAP] invalidateSize() ejecutado en initMap');
+                    console.log('[MAP] invalidateSize() ejecutado');
                 }
             }, 500);
         } catch (e) {
@@ -1293,17 +1156,15 @@
 
     function actualizarMapa() {
         if (!mapInstance || !mapInitialized) {
-            console.warn('[MAP] Mapa no inicializado, intentando initMap()...');
+            console.warn('[MAP] No se puede actualizar, mapa no inicializado');
             initMap();
             if (!mapInstance) return;
         }
 
         console.log('[MAP] Actualizando mapa...');
-        console.log('[MAP] Despacho coords:', despachoLat, despachoLon);
-        console.log('[MAP] Usuario coords:', userLat, userLon);
 
         mapInstance.eachLayer((layer) => {
-            if (layer !== tileLayer) {
+            if (layer instanceof L.Marker || layer instanceof L.Polyline || layer instanceof L.Polygon || layer instanceof L.LayerGroup) {
                 mapInstance.removeLayer(layer);
             }
         });
@@ -1322,24 +1183,33 @@
             return;
         }
 
+        console.log('[MAP] Coordenadas de despacho:', despachoLat, despachoLon);
+        console.log('[MAP] Dirección:', despachoDireccion);
+
+        if (!userLat || !userLon) {
+            console.warn('[MAP] Sin ubicación de usuario, mostrando solo destino');
+            L.marker([despachoLat, despachoLon], {
+                icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
+            }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
+            mapInstance.setView([despachoLat, despachoLon], 15);
+            mapInstance.invalidateSize();
+            return;
+        }
+
+        L.marker([userLat, userLon], {
+            icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
+        }).addTo(mapInstance).bindPopup('📍 Tu ubicación');
+
         L.marker([despachoLat, despachoLon], {
             icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
         }).addTo(mapInstance).bindPopup('📌 ' + despachoDireccion);
 
-        if (userLat && userLon) {
-            L.marker([userLat, userLon], {
-                icon: L.icon({ iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png', shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png' })
-            }).addTo(mapInstance).bindPopup('📍 Tu ubicación');
-        } else {
-            console.warn('[MAP] Sin ubicación de usuario');
-        }
-
-        if (routeGeometry && routeGeometry.length > 1 && userLat && userLon) {
+        if (routeGeometry && routeGeometry.length > 1) {
             console.log('[MAP] Dibujando ruta con', routeGeometry.length, 'puntos');
             L.polyline(routeGeometry, { color: '#4fa8ff', weight: 5, opacity: 0.8 })
                 .addTo(mapInstance)
                 .bindPopup(`🚗 ${formatearDistancia(despachoDistancia)} · ${formatearTiempo(despachoTiempo)}`);
-        } else if (userLat && userLon) {
+        } else {
             console.log('[MAP] Sin geometría de ruta, usando línea recta');
             L.polyline([[userLat, userLon], [despachoLat, despachoLon]], {
                 color: '#ff4444',
@@ -1349,10 +1219,10 @@
             }).addTo(mapInstance).bindPopup('⚠️ Distancia en línea recta (sin ruta)');
         }
 
-        const bounds = L.latLngBounds([ [despachoLat, despachoLon] ]);
-        if (userLat && userLon) {
-            bounds.extend([userLat, userLon]);
-        }
+        const bounds = L.latLngBounds([
+            [userLat, userLon],
+            [despachoLat, despachoLon]
+        ]);
         if (routeGeometry && routeGeometry.length > 1) {
             const routeBounds = L.latLngBounds(routeGeometry);
             bounds.extend(routeBounds);
@@ -1536,11 +1406,15 @@
     }
 
     // =============================================================
-    // DETECCIÓN DE DESPACHO Y SERVICIO
+    // DETECCIÓN DE DESPACHO (general)
     // =============================================================
     function contieneDespacho(valor) {
-        if (typeof valor === 'string') return valor.includes('Tiene Despacho');
-        if (Array.isArray(valor)) return valor.some(item => contieneDespacho(item));
+        if (typeof valor === 'string') {
+            return valor.includes('Tiene Despacho');
+        }
+        if (Array.isArray(valor)) {
+            return valor.some(item => contieneDespacho(item));
+        }
         if (valor && typeof valor === 'object') {
             for (const key in valor) {
                 if (contieneDespacho(valor[key])) return true;
@@ -1551,12 +1425,16 @@
 
     function extraerTextoDespacho(valor, acumulado = '') {
         if (typeof valor === 'string') {
-            if (valor.includes('Tiene Despacho')) return acumulado + (acumulado ? '\n' : '') + valor;
+            if (valor.includes('Tiene Despacho')) {
+                return acumulado + (acumulado ? '\n' : '') + valor;
+            }
             return acumulado;
         }
         if (Array.isArray(valor)) {
             let result = acumulado;
-            for (const item of valor) result = extraerTextoDespacho(item, result);
+            for (const item of valor) {
+                result = extraerTextoDespacho(item, result);
+            }
             return result;
         }
         if (valor && typeof valor === 'object') {
@@ -1574,78 +1452,52 @@
         return acumulado;
     }
 
-    function detectarDespachoConIndices(texto) {
+    // =============================================================
+    // parsearDespachoTexto (extrae dirección, ciudad y hora de texto con formato [0]: ...)
+    // =============================================================
+    function parsearDespachoTexto(texto) {
         if (typeof texto !== 'string') return null;
         const lineas = texto.split('\n');
-        let tieneIndices = false, hora = '--:--', ciudad = '', direccion = '', tieneDespacho = false;
-        for (const linea of lineas) {
-            const trimmed = linea.trim();
-            const match = trimmed.match(/^\[(\d+)\]:\s*(.*)$/);
+        let hora = '--:--';
+        let ciudad = '';
+        let direccion = '';
+        let zona = '';
+        let tieneDespacho = false;
+
+        for (let linea of lineas) {
+            linea = linea.trim();
+            const match = linea.match(/^\[(\d+)\]:\s*(.*)$/);
             if (match) {
                 const idx = parseInt(match[1], 10);
                 const valor = match[2].trim();
-                tieneIndices = true;
                 switch (idx) {
                     case 0: hora = valor || '--:--'; break;
                     case 1: ciudad = valor; break;
                     case 2: direccion = valor; break;
                     case 4: if (valor.includes('Tiene Despacho')) tieneDespacho = true; break;
+                    default: break;
                 }
+            } else {
+                if (linea.includes('Tiene Despacho')) tieneDespacho = true;
             }
         }
-        if (!tieneIndices) return null;
-        if (!direccion && ciudad) { direccion = ciudad; ciudad = ''; }
-        if (!tieneDespacho && (hora !== '--:--' || direccion)) tieneDespacho = true;
-        if (!tieneDespacho) return null;
-        if (!direccion || direccion === '') return null;
-        return { hora, direccion, ciudad: ciudad || '', zona: 'Zona no especificada', pregunta: 'Tiene Despacho' };
-    }
 
-    function detectarServicioConIndices(texto) {
-        if (typeof texto !== 'string') return null;
-        const lineas = texto.split('\n');
-        const campos = {};
-        let tieneIndices = false;
-        for (const linea of lineas) {
-            const match = linea.trim().match(/^\[(\d+)\]:\s*(.*)$/);
-            if (match) {
-                tieneIndices = true;
-                campos[parseInt(match[1], 10)] = match[2].trim();
-            }
+        if (!tieneDespacho) return null;
+        if (!direccion && ciudad) {
+            direccion = ciudad;
+            ciudad = '';
         }
-        if (!tieneIndices) return null;
-        const indices = Object.keys(campos).map(Number).sort((a, b) => a - b);
-        const LABELS = /OBSERVACIONES|AVISOS|NAVEGADOR|DEVOLVER|CLIENTE|IMPRIMIR|CONTADO/i;
-        const esServicioDespachado = indices.some(i => LABELS.test(campos[i]));
-        if (!esServicioDespachado) return null;
-        let labelStartIdx = indices.find(i => LABELS.test(campos[i]));
-        let phoneIdx = indices.find(i => /\d{6,}/.test(campos[i]));
-        if (phoneIdx === undefined) phoneIdx = 4;
-        const hora = (campos[0] || '--:--').replace('.', '').trim();
-        const ciudad = campos[2] || '';
-        const zona = campos[3] || '';
-        const conductorInfo = campos[phoneIdx] || '';
-        const direccionPartes = [];
-        for (const i of indices) {
-            if (i > phoneIdx && i < labelStartIdx) {
-                if (campos[i]) direccionPartes.push(campos[i]);
-            }
-        }
-        const direccion = direccionPartes.join(' ').replace(/\s+/g, ' ').trim();
-        const numMatch = conductorInfo.match(/(\d{5,})/);
-        const numero = numMatch ? numMatch[1] : hora;
         return {
-            number: numero,
-            time: hora,
-            zone: [zona, ciudad].filter(Boolean).join(' - '),
-            address: direccion || ciudad,
-            notes: conductorInfo,
-            status: 'DESPACHADO'
+            hora: hora,
+            direccion: direccion || 'Dirección no especificada',
+            ciudad: ciudad || '',
+            zona: zona || 'Zona no especificada',
+            pregunta: 'Tiene Despacho'
         };
     }
 
     // =============================================================
-    // PARSERS (completos)
+    // PARSERS
     // =============================================================
     function parseDetalleServicios(data) {
         if (!data || typeof data !== 'object') return null;
@@ -1761,6 +1613,7 @@
         };
     }
 
+    // parseOferta mejorado: acepta múltiples nombres de campo
     function parseOferta(data) {
         if (!data || typeof data !== 'object') return null;
         const normalized = {};
@@ -1768,13 +1621,46 @@
             let newKey = key.startsWith('ifac.td.smarttd:id/') ? key.replace('ifac.td.smarttd:id/', '') : key;
             normalized[newKey] = data[key];
         }
-        if (!normalized.txInfoAction || !normalized.txInfoAction.includes("Tiene Despacho")) return null;
-        const direccion = normalized.txSimpleAdress || normalized.tvPickup || normalized.tvAddress || normalized.tvDireccion || normalized.direccion || normalized.address || "";
-        const ciudad = normalized.txCity || normalized.tvCity || normalized.ciudad || "";
-        const zona = normalized.txPickUpZone || normalized.tvZona || normalized.zona || "";
-        const hora = normalized.txHour || normalized.tvPickupTime || normalized.hora || "--:--";
-        if (!direccion.trim()) return null;
-        return { hora, direccion, ciudad, zona, pregunta: normalized.txInfoAction };
+        
+        if (!normalized.txInfoAction || !normalized.txInfoAction.includes("Tiene Despacho")) {
+            return null;
+        }
+
+        const direccion = normalized.txSimpleAdress 
+                       || normalized.tvPickup 
+                       || normalized.tvAddress 
+                       || normalized.tvDireccion 
+                       || normalized.direccion 
+                       || normalized.address 
+                       || "";
+
+        const ciudad = normalized.txCity 
+                    || normalized.tvCity 
+                    || normalized.ciudad 
+                    || "";
+
+        const zona = normalized.txPickUpZone 
+                  || normalized.tvZona 
+                  || normalized.zona 
+                  || "";
+
+        const hora = normalized.txHour 
+                  || normalized.tvPickupTime 
+                  || normalized.hora 
+                  || "--:--";
+
+        if (!direccion.trim()) {
+            console.warn('[parseOferta] Dirección vacía, no se puede procesar.');
+            return null;
+        }
+
+        return {
+            hora: hora,
+            direccion: direccion,
+            ciudad: ciudad,
+            zona: zona,
+            pregunta: normalized.txInfoAction
+        };
     }
 
     function parseServicio(data) {
@@ -1876,18 +1762,13 @@
         console.log('[renderDespachoConRuta] Zona:', zona);
         console.log('[renderDespachoConRuta] Hora:', hora);
 
-        currentDireccionOriginal = direccionTexto;
-        currentCiudadOriginal = ciudad || '';
-        currentZonaOriginal = zona || '';
-        currentHoraOriginal = hora || '';
-        currentPreguntaOriginal = pregunta || '';
-
-        if (!direccionTexto || direccionTexto.trim() === '') {
-            console.error('[renderDespachoConRuta] Dirección vacía.');
-            mostrarModalSimple('Dirección no disponible', ciudad || '', zona, hora, pregunta);
+        if (!direccionTexto || direccionTexto.trim() === '' || !ciudad || ciudad.trim() === '') {
+            console.error('[renderDespachoConRuta] No hay dirección suficiente para geocodificar el despacho.');
+            mostrarModalSimple(direccionTexto || 'Dirección no disponible', ciudad || '', zona, hora, pregunta);
             return;
         }
 
+        console.log('[DESPACHO] Renderizando con ruta para:', direccionTexto, ciudad);
         limpiarDatosRuta();
 
         const userPos = await obtenerPosicionUsuario();
@@ -1897,12 +1778,14 @@
             mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
             return;
         }
+
         userLat = userPos.lat;
         userLon = userPos.lon;
 
-        const coords = await geocodificarDireccionInteligente(direccionTexto, ciudad);
+        const dirCompleta = direccionTexto + ', ' + ciudad;
+        const coords = await geocodificarDireccion(dirCompleta);
         if (!coords) {
-            console.warn('[DESPACHO] No se pudo geolocalizar la dirección');
+            console.warn('[DESPACHO] No se pudo geocodificar la dirección');
             setToast('⚠️ No se pudo geolocalizar la dirección', 'warning');
             mostrarModalSimple(direccionTexto, ciudad, zona, hora, pregunta);
             return;
@@ -1910,7 +1793,7 @@
 
         despachoLat = coords.lat;
         despachoLon = coords.lon;
-        despachoDireccion = direccionTexto + (ciudad ? ', ' + ciudad : '');
+        despachoDireccion = dirCompleta;
         console.log('[DESPACHO] Coordenadas de destino:', despachoLat, despachoLon);
 
         const ruta = await obtenerRutaOSRM(userLat, userLon, despachoLat, despachoLon);
@@ -1951,7 +1834,7 @@
         modalContent.innerHTML = html;
         setViewState(STATE_OFERTA);
         iniciarAlertaDespacho();
-        lanzarNotificacionNativa(direccionTexto + (ciudad ? ' - ' + ciudad : '') + ' (a ' + formatearDistancia(distanciaKm) + ')');
+        lanzarNotificacionNativa(direccionTexto + ' - ' + ciudad + ' (a ' + formatearDistancia(distanciaKm) + ')');
     }
 
     function mostrarModalSimple(direccion, ciudad, zona, hora, pregunta) {
@@ -1971,7 +1854,7 @@
         modalContent.innerHTML = html;
         setViewState(STATE_OFERTA);
         iniciarAlertaDespacho();
-        lanzarNotificacionNativa(direccion + (ciudad ? ' - ' + ciudad : ''));
+        lanzarNotificacionNativa(direccion + ' - ' + ciudad);
     }
 
     function renderDespachoSimple(texto) {
@@ -1988,7 +1871,7 @@
         srvStatusEl.textContent = servicioData.status.toUpperCase();
         srvTimeEl.textContent = servicioData.time;
         srvZoneEl.textContent = servicioData.zone || "---";
-        srvAddressEl.textContent = servicioData.address || "---";
+        srvAddressEl.textContent = servicioData.address || servicioData.pickup || "---";
         srvObsEl.textContent = servicioData.notes || "Sin observaciones";
         setViewState(STATE_SERVICIO);
         setToast('🚕 Servicio en curso', 'info');
@@ -1997,7 +1880,6 @@
     function ocultarModal() {
         modalOverlay.classList.remove('active');
         detenerAlertaDespacho();
-        direccionEditArea.style.display = 'none';
     }
 
     modalAccept.addEventListener('click', () => {
@@ -2015,265 +1897,161 @@
     });
 
     // =============================================================
-    // CORRECCIÓN DE DIRECCIÓN
-    // =============================================================
-    modalCorregir.addEventListener('click', () => {
-        if (direccionEditArea.style.display === 'none') {
-            direccionEditArea.style.display = 'flex';
-            inputDireccionCorregida.value = currentDireccionOriginal + (currentCiudadOriginal ? ', ' + currentCiudadOriginal : '');
-            inputDireccionCorregida.focus();
-        } else {
-            direccionEditArea.style.display = 'none';
-        }
-    });
-
-    btnAplicarCorreccion.addEventListener('click', async () => {
-        const nuevaDireccion = inputDireccionCorregida.value.trim();
-        if (!nuevaDireccion) {
-            setToast('❌ Escribe una dirección válida', 'error');
-            return;
-        }
-        direccionEditArea.style.display = 'none';
-        setToast('🔍 Re-geocodificando...', 'info');
-        const coords = await geocodificarDireccionInteligente(nuevaDireccion, '');
-        if (!coords) {
-            setToast('❌ No se pudo localizar la dirección', 'error');
-            return;
-        }
-        despachoLat = coords.lat;
-        despachoLon = coords.lon;
-        despachoDireccion = nuevaDireccion;
-        if (userLat && userLon) {
-            const ruta = await obtenerRutaOSRM(userLat, userLon, despachoLat, despachoLon);
-            if (ruta) {
-                despachoDistancia = ruta.distancia_km;
-                despachoTiempo = ruta.tiempo_min;
-                routeGeometry = ruta.geometry;
-            } else {
-                despachoDistancia = calcularDistanciaLineal(userLat, userLon, despachoLat, despachoLon);
-                despachoTiempo = despachoDistancia / 30 * 60;
-                routeGeometry = null;
-                setToast('⚠️ Ruta en línea recta (sin carretera)', 'warning');
-            }
-            setToast('✅ Dirección actualizada', 'success');
-            const html = `
-                <div style="font-size:1.2rem; font-weight:700; color:#f4c542; margin-bottom:8px;">${escapeHtml(currentHoraOriginal)}</div>
-                <div style="margin-bottom:8px; line-height:1.5;">
-                    ${escapeHtml(nuevaDireccion)}<br>
-                    ${escapeHtml(currentCiudadOriginal)}<br>
-                    <b>Zona:</b> ${escapeHtml(currentZonaOriginal)}
-                </div>
-                <div class="despacho-distancia">
-                    <span>🚗 ${formatearDistancia(despachoDistancia)}</span>
-                    <span>⏱️ ${formatearTiempo(despachoTiempo)}</span>
-                </div>
-                <div style="border-top:1px solid #1e3a5a; padding-top:12px; margin-top:8px; font-weight:700; text-align:center; color:#fff;">
-                    ${escapeHtml(currentPreguntaOriginal)}
-                </div>
-            `;
-            modalContent.innerHTML = html;
-        } else {
-            setToast('⚠️ No hay ubicación de usuario, no se puede calcular ruta', 'warning');
-        }
-    });
-
-    // =============================================================
-    // PROCESADOR DE MENSAJES
+    // PROCESADOR GENERAL DE MENSAJES
     // =============================================================
     async function processIncomingMessage(rawPayload) {
         console.log("========== MENSAJE RECIBIDO ==========");
         console.log("RAW:", rawPayload);
         console.log("TIPO:", typeof rawPayload);
-        
-        let rawStr = typeof rawPayload === 'string' ? rawPayload : JSON.stringify(rawPayload, null, 2);
-        console.log("Raw string:", rawStr);
 
         try {
             let jsonPayload = null;
-            let textPayload = null;
 
-            function arrayToIndexText(arr) {
-                if (!Array.isArray(arr)) return null;
-                return arr.map((v, i) => `[${i}]: ${v}`).join('\n');
+            if (typeof rawPayload === 'string') {
+                const trimmed = rawPayload.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    try {
+                        jsonPayload = JSON.parse(trimmed);
+                    } catch (_) {
+                        jsonPayload = trimmed;
+                    }
+                } else {
+                    jsonPayload = trimmed;
+                }
+            } else {
+                jsonPayload = rawPayload;
             }
 
-            if (Array.isArray(rawPayload)) {
-                textPayload = arrayToIndexText(rawPayload);
-                console.log('[PROCESS] Payload es array, convertido a índices');
-            } else if (rawPayload && typeof rawPayload === 'object') {
-                const numericKeys = Object.keys(rawPayload).filter(k => /^\d+$/.test(k));
-                if (numericKeys.length > 0) {
-                    const sorted = numericKeys.map(Number).sort((a,b) => a-b);
-                    const arr = sorted.map(k => rawPayload[k]);
-                    textPayload = arrayToIndexText(arr);
-                    console.log('[PROCESS] Objeto con claves numéricas convertido a índices');
-                } else {
-                    const bracketKeys = Object.keys(rawPayload).filter(k => /^\[\d+\]$/.test(k)).sort();
-                    if (bracketKeys.length > 0) {
-                        const lines = bracketKeys.map(k => `${k}: ${rawPayload[k]}`);
-                        textPayload = lines.join('\n');
-                        console.log('[PROCESS] Objeto con índices en corchetes convertido a texto');
-                    }
-                }
-                if (rawPayload.message !== undefined) {
-                    const msg = rawPayload.message;
-                    if (Array.isArray(msg)) {
-                        textPayload = arrayToIndexText(msg);
-                        console.log('[PROCESS] message es array, convertido a índices');
-                    } else if (typeof msg === 'string') {
+            // Desenvolver mensaje de ntfy
+            if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
+                if (typeof jsonPayload.message === 'string') {
+                    const trimmedMsg = jsonPayload.message.trim();
+                    if (trimmedMsg.startsWith('{') || trimmedMsg.startsWith('[')) {
                         try {
-                            const parsed = JSON.parse(msg);
-                            if (Array.isArray(parsed)) {
-                                textPayload = arrayToIndexText(parsed);
-                                console.log('[PROCESS] message string parseado como array JSON, convertido');
-                            }
+                            jsonPayload = JSON.parse(trimmedMsg);
                         } catch (_) {
-                            textPayload = msg;
+                            jsonPayload = trimmedMsg;
                         }
                     } else {
-                        textPayload = JSON.stringify(msg);
+                        jsonPayload = trimmedMsg;
                     }
-                }
-                jsonPayload = rawPayload;
-            } else if (typeof rawPayload === 'string') {
-                textPayload = rawPayload;
-                try {
-                    const parsed = JSON.parse(rawPayload);
-                    if (Array.isArray(parsed)) {
-                        textPayload = arrayToIndexText(parsed);
-                        console.log('[PROCESS] String JSON array parseado y convertido');
-                    } else if (parsed && typeof parsed === 'object') {
-                        jsonPayload = parsed;
-                        if (parsed.message) {
-                            const msg = parsed.message;
-                            if (Array.isArray(msg)) {
-                                textPayload = arrayToIndexText(msg);
-                            } else if (typeof msg === 'string') {
-                                try {
-                                    const inner = JSON.parse(msg);
-                                    if (Array.isArray(inner)) {
-                                        textPayload = arrayToIndexText(inner);
-                                    }
-                                } catch (_) {}
-                            }
-                        }
-                    }
-                } catch (_) {}
-            }
-
-            if (!textPayload && jsonPayload) {
-                if (typeof jsonPayload === 'object') {
-                    // no forzar
                 } else {
-                    textPayload = JSON.stringify(jsonPayload);
+                    jsonPayload = jsonPayload.message;
                 }
             }
 
-            console.log("[PROCESS] textPayload final:", textPayload);
-            console.log("[PROCESS] jsonPayload:", jsonPayload);
+            console.log("JSON FINAL:", jsonPayload);
             console.log("=======================================");
 
-            // Detecciones
-            if (textPayload) {
-                const servicioDetectado = detectarServicioConIndices(textPayload);
-                if (servicioDetectado) {
-                    console.log('[SERVICIO] ¡Servicio detectado por índices!', servicioDetectado);
-                    renderServicio(servicioDetectado);
-                    return;
+            let esDespacho = false;
+            let textoDespacho = '';
+
+            if (typeof jsonPayload === 'string') {
+                if (jsonPayload.includes('Tiene Despacho')) {
+                    esDespacho = true;
+                    textoDespacho = jsonPayload;
+                }
+            } else if (jsonPayload && typeof jsonPayload === 'object') {
+                esDespacho = contieneDespacho(jsonPayload);
+                if (esDespacho) {
+                    textoDespacho = extraerTextoDespacho(jsonPayload);
+                    if (!textoDespacho) textoDespacho = JSON.stringify(jsonPayload, null, 2);
                 }
             }
 
-            if (textPayload) {
-                const despachoDetectado = detectarDespachoConIndices(textPayload);
-                if (despachoDetectado) {
-                    console.log('[DESPACHO] ¡Despacho detectado por índices!', despachoDetectado);
-                    limpiarDatosRuta();
-                    await renderDespachoConRuta(
-                        despachoDetectado.direccion,
-                        despachoDetectado.ciudad,
-                        despachoDetectado.zona,
-                        despachoDetectado.hora,
-                        despachoDetectado.pregunta
-                    );
-                    setToast('📨 ¡Nuevo despacho!', 'warning');
-                    return;
-                }
-            }
-
-            if (jsonPayload && typeof jsonPayload === 'object') {
-                if (contieneDespacho(jsonPayload)) {
-                    console.log('[DESPACHO] Despacho detectado en objeto JSON');
-                    limpiarDatosRuta();
-                    let ofertaParsed = parseOferta(jsonPayload);
-                    if (ofertaParsed) {
-                        await renderDespachoConRuta(
-                            ofertaParsed.direccion,
-                            ofertaParsed.ciudad,
-                            ofertaParsed.zona,
-                            ofertaParsed.hora,
-                            ofertaParsed.pregunta
-                        );
-                    } else {
-                        const textoDespacho = extraerTextoDespacho(jsonPayload) || JSON.stringify(jsonPayload, null, 2);
-                        renderDespachoSimple(textoDespacho);
-                    }
-                    setToast('📨 ¡Nuevo despacho!', 'warning');
-                    return;
-                }
-            }
-
-            if (textPayload && textPayload.includes('Tiene Despacho')) {
-                console.log('[DESPACHO] Despacho detectado en string plano');
+            if (esDespacho) {
+                console.log('[DESPACHO] ¡Despacho detectado!');
                 limpiarDatosRuta();
-                renderDespachoSimple(textPayload);
+
+                let ofertaParsed = parseOferta(jsonPayload);
+                console.log("OFERTA PARSEADA (objeto):", ofertaParsed);
+
+                if (!ofertaParsed && typeof jsonPayload === 'string') {
+                    const textoParseado = parsearDespachoTexto(jsonPayload);
+                    console.log("OFERTA PARSEADA (texto):", textoParseado);
+                    if (textoParseado) {
+                        ofertaParsed = textoParseado;
+                    }
+                }
+
+                if (ofertaParsed) {
+                    console.log('[DESPACHO] Oferta estructurada:', ofertaParsed);
+                    await renderDespachoConRuta(
+                        ofertaParsed.direccion,
+                        ofertaParsed.ciudad,
+                        ofertaParsed.zona,
+                        ofertaParsed.hora,
+                        ofertaParsed.pregunta
+                    );
+                } else {
+                    console.log('[DESPACHO] No se pudo extraer estructura, mostrando sin ruta');
+                    renderDespachoSimple(textoDespacho);
+                }
                 setToast('📨 ¡Nuevo despacho!', 'warning');
                 return;
             }
 
-            // Parsers
-            if (jsonPayload && typeof jsonPayload === 'object') {
-                const servicioParsed = parseServicio(jsonPayload);
-                if (servicioParsed) {
-                    renderServicio(servicioParsed);
-                    return;
-                }
-                const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
-                if (detalleServiciosParsed) {
-                    renderDetalleServicios(detalleServiciosParsed);
-                    updateTimestamp();
-                    return;
-                }
-                const detalleParadaParsed = parseDetalleParada(jsonPayload);
-                if (detalleParadaParsed) {
-                    renderDetalleParada(detalleParadaParsed);
-                    updateTimestamp();
-                    return;
-                }
-                const monitorParsed = parseMonitor(jsonPayload);
-                if (monitorParsed) {
-                    renderMonitor(monitorParsed);
-                    updateTimestamp();
-                    setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
-                    return;
-                }
+            // Resto de parsers
+            const servicioParsed = parseServicio(jsonPayload);
+            if (servicioParsed) {
+                renderServicio(servicioParsed);
+                return;
             }
 
-            if (textPayload) {
-                setToast('📩 Datos recibidos (no reconocidos)', 'info');
-                console.log('[PROCESS] Mensaje no reconocido (texto):', textPayload);
-            } else if (jsonPayload) {
-                setToast('📩 Datos JSON no reconocidos', 'info');
-                console.log('[PROCESS] Mensaje JSON no reconocido:', jsonPayload);
-            } else {
-                setToast('⚠️ Datos no reconocidos', 'warning');
-                console.log('[PROCESS] Payload vacío o no reconocido');
+            const detalleServiciosParsed = parseDetalleServicios(jsonPayload);
+            if (detalleServiciosParsed) {
+                renderDetalleServicios(detalleServiciosParsed);
+                updateTimestamp();
+                return;
             }
+
+            const detalleParadaParsed = parseDetalleParada(jsonPayload);
+            if (detalleParadaParsed) {
+                renderDetalleParada(detalleParadaParsed);
+                updateTimestamp();
+                return;
+            }
+
+            const monitorParsed = parseMonitor(jsonPayload);
+            if (monitorParsed) {
+                renderMonitor(monitorParsed);
+                updateTimestamp();
+                setToast(`✅ Monitor actualizado (${monitorParsed.tableData.length} zonas)`, 'success');
+                return;
+            }
+
+            // Si llegamos aquí, el mensaje no se reconoció
+            console.warn('⚠️ Mensaje no reconocido:', jsonPayload);
+            logToConsole('warn', 'Mensaje no reconocido', jsonPayload);
+            setToast('⚠️ Datos no reconocidos (ver consola)', 'warning');
 
         } catch (e) {
             console.error('[PROCESS] Error en processIncomingMessage:', e);
-            setToast('❌ Error al procesar mensaje: ' + e.message, 'error');
+            logToConsole('error', 'Error al procesar mensaje', e.message);
+            setToast('❌ Error al procesar mensaje', 'error');
         }
     }
+
+    // =============================================================
+    // ENVÍO DE COMANDOS
+    // =============================================================
+    function sendCommand(cmd) {
+        if (!cmd) return;
+        const url = WEBHOOK_URL + '?cmd=' + encodeURIComponent(cmd);
+        setToast(`📤 Enviando "${cmd}"...`, 'info');
+        fetch(url, { method: 'GET', mode: 'no-cors', cache: 'no-cache' })
+            .then(() => setToast(`✅ Comando "${cmd}" enviado`, 'success'))
+            .catch(err => setToast(`❌ Error: ${err.message}`, 'error'));
+    }
+
+    document.querySelectorAll('[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const cmd = this.getAttribute('data-cmd');
+            this.style.transform = 'scale(0.92)';
+            setTimeout(() => this.style.transform = '', 150);
+            sendCommand(cmd);
+        });
+    });
 
     // =============================================================
     // CONEXIÓN NTFY
@@ -2281,7 +2059,6 @@
     function connectToNtfy() {
         setToast('🔄 Conectando a ntfy.sh...', 'info');
         setStatus(false, 'Conectando...');
-        console.log('[NTFY] Conectando...');
 
         try {
             if (eventSource) {
@@ -2295,7 +2072,6 @@
                 setToast('✅ Conectado, esperando datos...', 'success');
                 setStatus(true, 'Conectado');
                 lastMessageTime = Date.now();
-                console.log('[NTFY] Conexión SSE establecida');
             };
 
             eventSource.onmessage = function(event) {
@@ -2303,14 +2079,12 @@
                 if (raw === 'ping' || raw === 'keepalive') return;
                 lastMessageTime = Date.now();
                 setStatus(true, 'Conectado');
-                console.log('[NTFY] Mensaje recibido:', raw);
                 processIncomingMessage(raw);
             };
 
             eventSource.onerror = function() {
                 setStatus(false, 'NO CONECTADO');
                 setToast('⚠️ Error en conexión ntfy', 'error');
-                console.error('[NTFY] Error en conexión SSE');
                 setTimeout(() => {
                     if (eventSource && eventSource.readyState === EventSource.CLOSED) {
                         connectToNtfy();
@@ -2322,14 +2096,12 @@
                 if (connected && Date.now() - lastMessageTime > 15000) {
                     setStatus(false, 'NO CONECTADO');
                     setToast('⏳ Sin datos desde hace 15s', 'warning');
-                    console.warn('[NTFY] Timeout: sin datos desde hace 15s');
                 }
             }, 5000);
 
         } catch (e) {
             setToast('❌ Error al conectar: ' + e.message, 'error');
             setStatus(false, 'NO CONECTADO');
-            console.error('[NTFY] Error al conectar:', e);
         }
     }
 
@@ -2337,32 +2109,28 @@
     // PRUEBAS MANUALES
     // =============================================================
     document.getElementById('btnTestOferta').addEventListener('click', () => {
-        const testData = {
+        processIncomingMessage({
             txInfoAction: "Tiene Despacho",
             txHour: "10:20",
             txSimpleAdress: "Avenida del Ensanche de Vallecas, 102",
             txCity: "Madrid",
             txPickUpZone: "ENSANCHE VALL"
-        };
-        console.log('[PRUEBA] Oferta:', testData);
-        processIncomingMessage(testData);
+        });
     });
 
     document.getElementById('btnTestServicio').addEventListener('click', () => {
-        const testData = {
+        processIncomingMessage({
             tvDespatchNumber: "84920",
             tvPickupTime: "12:45",
             tvPickup: "Calle de Alcalá, 42",
             tvZona: "CENTRO - RETIRO",
             tvText: "Pasar a recoger en la puerta principal.",
             txInfoStateBottomBar: "DESPACHADO"
-        };
-        console.log('[PRUEBA] Servicio:', testData);
-        processIncomingMessage(testData);
+        });
     });
 
     document.getElementById('btnTestParada').addEventListener('click', () => {
-        const testData = {
+        processIncomingMessage({
             tvHeaderText: "P: TERMINAL 4 - 19",
             tvCarInfo: "5504-17:06",
             "tvCarInfo$2": "1890-17:10",
@@ -2374,13 +2142,11 @@
             "tvCarInfo$8": "3072-17:23",
             "tvCarInfo$9": "6-1266--17:23",
             "tvCarInfo$10": "5733-17:23"
-        };
-        console.log('[PRUEBA] Parada:', testData);
-        processIncomingMessage(testData);
+        });
     });
 
     document.getElementById('btnTestRuta').addEventListener('click', () => {
-        const testData = {
+        processIncomingMessage({
             tvHeaderText: "R: TERMINAL 4 - 18",
             tvPickupTime: "19:10",
             tvZoneName: "G. NOBLEJAS",
@@ -2388,54 +2154,28 @@
             "txButtonText$2": "VER TODOS",
             "txButtonText$3": "CERRAR",
             txInfoStateBottomBar: "LIBRE"
-        };
-        console.log('[PRUEBA] Ruta:', testData);
-        processIncomingMessage(testData);
+        });
     });
 
     document.getElementById('btnTestMonitor').addEventListener('click', () => {
-        const testData = {
+        processIncomingMessage({
             tvHeaderText: "Z: ENSANCHE VALL",
             txInfoStateBottomBar: "LIBRE",
             tvZoneName: "ENSANCHE VALL",
             tvOnStop: "2", tvOnZone: "6", tvHired: "1", tvTrips: "10",
             "tvZoneName$1": "VILLA VALLECAS",
             "tvOnStop$1": "0", "tvOnZone$1": "4", "tvHired$1": "0", "tvTrips$1": "5"
-        };
-        console.log('[PRUEBA] Monitor:', testData);
-        processIncomingMessage(testData);
+        });
     });
 
     document.getElementById('btnTestDespachoReal').addEventListener('click', () => {
         const testMsg = {
-            "[0]": "23:03",
-            "[1]": "22:58 Rivas Vaciamadrid",
-            "[2]": "calle Lago Bañolas",
-            "[3]": "",
-            "[4]": "Tiene Despacho"
+            txInfoAction: "Tiene Despacho",
+            txHour: "13:45",
+            txSimpleAdress: "Puerta del Sol",
+            txCity: "Madrid",
+            txPickUpZone: "CENTRO"
         };
-        console.log('[PRUEBA] Despacho índices:', testMsg);
-        processIncomingMessage(testMsg);
-    });
-
-    document.getElementById('btnTestServicioReal').addEventListener('click', () => {
-        const testMsg = {
-            "[0]": "16:26.",
-            "[1]": "<",
-            "[2]": "VACIAMADRID",
-            "[3]": "METRO Rivas",
-            "[4]": "ANA-163472891 O 16:26",
-            "[5]": "Urbanizaciones (Paseo del Ferrocarril 1, Colonia Covibar-Rivas-Vaciamadrid,",
-            "[6]": "Madrid )",
-            "[7]": "OBSERVACIONES",
-            "[8]": "AVISOS",
-            "[9]": "***CONTADO***",
-            "[10]": "IMPRIMIR",
-            "[11]": "NAVEGADOR",
-            "[12]": "DEVOLVER",
-            "[13]": "CLIENTE"
-        };
-        console.log('[PRUEBA] Servicio índices:', testMsg);
         processIncomingMessage(testMsg);
     });
 
@@ -2444,23 +2184,11 @@
         titleClicks++;
         if (titleClicks >= 3) {
             titleClicks = 0;
-            const testMsg = {
-                "[0]": "16:26.",
-                "[1]": "<",
-                "[2]": "VACIAMADRID",
-                "[3]": "METRO Rivas",
-                "[4]": "ANA-163472891 O 16:26",
-                "[5]": "Urbanizaciones (Paseo del Ferrocarril 1, Colonia Covibar-Rivas-Vaciamadrid,",
-                "[6]": "Madrid )",
-                "[7]": "OBSERVACIONES",
-                "[8]": "AVISOS",
-                "[9]": "***CONTADO***",
-                "[10]": "IMPRIMIR",
-                "[11]": "NAVEGADOR",
-                "[12]": "DEVOLVER",
-                "[13]": "CLIENTE"
-            };
-            console.log('[PRUEBA] Triple click en título:', testMsg);
+            const testMsg = `[0]: 23:03
+[1]: 22:58 Rivas Vaciamadrid
+[2]: calle Lago Bañolas
+[3]:
+[4]: Tiene Despacho`;
             processIncomingMessage(testMsg);
         }
     });
@@ -2485,15 +2213,17 @@
     // =============================================================
     // INICIALIZACIÓN
     // =============================================================
-    loadWebhookUrl();
     renderMonitor({ tableData: [] });
     updateTimestamp();
     connectToNtfy();
     setInterval(updateTimestamp, 2000);
     solicitarWakeLock();
 
-    console.log('✅ Aplicación iniciada correctamente');
-    console.log('📡 Webhook URL:', WEBHOOK_URL);
+    // Mensaje de bienvenida en la consola
+    logToConsole('info', 'Smart TD Monitor iniciado');
+    logToConsole('info', 'Conectando a ntfy.sh...');
+
+    console.log('✅ Aplicación iniciada');
     </script>
 </body>
-    </html>
+</html>
