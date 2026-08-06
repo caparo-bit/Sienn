@@ -19,10 +19,6 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* ============================================
-           ESTILOS (mismos que tenías, no los repito
-           para no alargar, pero están incluidos)
-           ============================================ */
         :root { --bg-dark: #08111f; --card-bg: #0c1526; --header-bg: #1f8a3c; --accent-gold: #f4a623; --accent-blue: #4fa8ff; --accent-green: #22c55e; --accent-red: #ef4444; --text-main: #f0f4fa; --text-muted: #7fa6c9; --table-header: #0f1f33; --border-color: #1e3a5a; }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', Roboto, system-ui, sans-serif; }
         html { height:100%; }
@@ -131,7 +127,6 @@
         .map-header .map-title { font-weight: 700; font-size: 1rem; color: #f4c542; }
         .demo-bar { margin-top: 10px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); flex-wrap: wrap; gap: 4px; }
         .demo-bar button { background: #1e3a5a; color: #fff; border: none; padding: 3px 8px; border-radius: 8px; font-size: 0.65rem; cursor: pointer; font-weight: 600; }
-        /* Configuración */
         .config-container { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
         .config-container .config-title { font-size: 1.2rem; font-weight: 700; color: var(--accent-gold); text-align: center; margin-bottom: 8px; }
         .config-field { display: flex; flex-direction: column; gap: 4px; }
@@ -145,7 +140,6 @@
         .config-actions .btn-save { background: #0f7b3a; color: #e0f2e0; }
         .config-actions .btn-cancel { background: #1e3a5a; color: #b3d9ff; }
         .config-actions .btn-reconnect { background: #b45309; color: #fff3e0; }
-        /* Consola */
         #debugConsole { background: #0a0a0a; color: #00ff88; font-family: 'Courier New', monospace; font-size: 0.7rem; padding: 8px 12px; max-height: 200px; overflow-y: auto; border-top: 1px solid #1e3a5a; margin-top: 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.4; scroll-behavior: smooth; }
         #debugConsole .log-line { border-bottom: 1px solid #1a1a1a; padding: 2px 0; }
         #debugConsole .log-time { color: #888; }
@@ -369,7 +363,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // =============================================================
-        // CONFIGURACIÓN (cargada desde localStorage o valores por defecto)
+        // CONFIGURACIÓN (cargada desde localStorage)
         // =============================================================
         const STORAGE_KEY_WEBHOOK = 'smarttd_webhook_url';
         const STORAGE_KEY_NTFY = 'smarttd_ntfy_topic';
@@ -422,7 +416,6 @@
             debugConsoleEl.scrollTop = debugConsoleEl.scrollHeight;
         }
 
-        // Interceptar console.log/warn/error para redirigir a la consola visual
         const originalLog = console.log;
         const originalWarn = console.warn;
         const originalError = console.error;
@@ -1038,7 +1031,7 @@
         }
 
         // =============================================================
-        // DETECCIÓN DE DESPACHO (general)
+        // DETECCIÓN DE DESPACHO
         // =============================================================
         function contieneDespacho(valor) {
             if (typeof valor === 'string') {
@@ -1084,9 +1077,6 @@
             return acumulado;
         }
 
-        // =============================================================
-        // parsearDespachoTexto (extrae dirección, ciudad y hora de texto con formato [0]: ...)
-        // =============================================================
         function parsearDespachoTexto(texto) {
             if (typeof texto !== 'string') return null;
             const lineas = texto.split('\n');
@@ -1245,7 +1235,6 @@
             };
         }
 
-        // parseOferta mejorado: acepta múltiples nombres de campo
         function parseOferta(data) {
             if (!data || typeof data !== 'object') return null;
             const normalized = {};
@@ -1554,7 +1543,6 @@
                     jsonPayload = rawPayload;
                 }
 
-                // Desenvolver mensaje de ntfy
                 if (jsonPayload && typeof jsonPayload === 'object' && jsonPayload.message) {
                     if (typeof jsonPayload.message === 'string') {
                         const trimmedMsg = jsonPayload.message.trim();
@@ -1623,7 +1611,6 @@
                     return;
                 }
 
-                // Resto de parsers
                 const servicioParsed = parseServicio(jsonPayload);
                 if (servicioParsed) {
                     renderServicio(servicioParsed);
@@ -1652,7 +1639,6 @@
                     return;
                 }
 
-                // Si llegamos aquí, el mensaje no se reconoció
                 console.warn('⚠️ Mensaje no reconocido:', jsonPayload);
                 logToConsole('warn', 'Mensaje no reconocido', jsonPayload);
                 setToast('⚠️ Datos no reconocidos (ver consola)', 'warning');
@@ -1686,7 +1672,7 @@
         });
 
         // =============================================================
-        // CONEXIÓN NTFY (CORREGIDA)
+        // CONEXIÓN NTFY
         // =============================================================
         function connectToNtfy() {
             console.log('[NTFY] Conectando a:', NTFY_SSE_URL);
@@ -1820,11 +1806,7 @@
             titleClicks++;
             if (titleClicks >= 3) {
                 titleClicks = 0;
-                const testMsg = `[0]: 23:03
-[1]: 22:58 Rivas Vaciamadrid
-[2]: calle Lago Bañolas
-[3]:
-[4]: Tiene Despacho`;
+                const testMsg = `[0]: 23:03\n[1]: 22:58 Rivas Vaciamadrid\n[2]: calle Lago Bañolas\n[3]:\n[4]: Tiene Despacho`;
                 processIncomingMessage(testMsg);
             }
         });
@@ -1833,12 +1815,17 @@
         // REGISTRO DEL SERVICE WORKER Y PERMISOS
         // =============================================================
         if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-        .then(reg => console.log('✅ SW registrado', reg))
-        .catch(err => console.error('❌ Error SW:', err));
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => {
+                    console.log('✅ SW registrado correctamente');
+                    logToConsole('info', 'Service Worker registrado');
+                })
+                .catch(err => {
+                    console.error('❌ Error al registrar SW:', err);
+                    logToConsole('error', 'Error SW', err.message);
+                });
         }
 
-        // Solicitar permisos de notificación al iniciar
         setTimeout(solicitarPermisoNotificaciones, 1000);
 
         // =============================================================
