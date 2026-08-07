@@ -1171,6 +1171,25 @@
             }
         }
 
+        // Escuchar mensajes del Service Worker (para acciones de notificaciones)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                const msg = event.data;
+                if (msg && msg.type === 'NOTIFICATION_ACTION') {
+                    const action = msg.action;
+                    if (action === 'aceptar') {
+                        sendCommand("despacho_aceptar");
+                        ocultarModal();
+                        setToast("✅ Despacho aceptado desde notificación", "success");
+                    } else if (action === 'rechazar') {
+                        sendCommand("despacho_rechazar");
+                        ocultarModal();
+                        setToast("❌ Despacho rechazado desde notificación", "error");
+                    }
+                }
+            });
+        }
+
         // =============================================================
         // DETECCIÓN DE DESPACHO
         // =============================================================
@@ -1987,17 +2006,44 @@
         });
 
         // =============================================================
-        // REGISTRO DEL SERVICE WORKER Y PERMISOS
+        // REGISTRO DEL SERVICE WORKER (INLINE, EL QUE FUNCIONA)
         // =============================================================
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
+            // Primero, cancelamos cualquier SW previo (no es necesario, pero por si acaso)
+            // Usamos un código inline que toma control inmediato
+            const swCode = `
+                self.addEventListener('install', (e) => self.skipWaiting());
+                self.addEventListener('activate', (e) => self.clients.claim());
+                
+                self.addEventListener('notificationclick', (event) => {
+                    event.notification.close();
+                    const action = event.action;
+                    event.waitUntil(
+                        self.clients.matchAll({ type: 'window' }).then((clientList) => {
+                            for (const client of clientList) {
+                                if (client.url && 'focus' in client) {
+                                    client.focus();
+                                    client.postMessage({ type: 'NOTIFICATION_ACTION', action: action });
+                                    return;
+                                }
+                            }
+                            if (self.clients.openWindow) {
+                                return self.clients.openWindow('./index.html');
+                            }
+                        })
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl)
                 .then(reg => {
-                    console.log('✅ SW registrado correctamente');
-                    logToConsole('info', 'Service Worker registrado');
+                    console.log('✅ SW inline registrado correctamente');
+                    logToConsole('info', 'Service Worker inline registrado');
                 })
                 .catch(err => {
-                    console.error('❌ Error al registrar SW:', err);
-                    logToConsole('error', 'Error SW', err.message);
+                    console.error('❌ Error al registrar SW inline:', err);
+                    logToConsole('error', 'Error SW inline', err.message);
                 });
         }
 
@@ -2080,4 +2126,4 @@
         }
     </script>
 </body>
-    </html>
+</html>
